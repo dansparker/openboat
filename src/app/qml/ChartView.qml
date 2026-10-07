@@ -64,7 +64,7 @@ Item {
         return list;
     }
 
-    Rectangle { anchors.fill: parent; color: "#a8c8e0" }  // shown where no chart exists
+    Rectangle { anchors.fill: parent; color: Theme.water }  // shown where no chart exists
 
     Repeater {
         model: chart.layers
@@ -215,9 +215,9 @@ Item {
         anchors.margins: 8
         readonly property real nm: 100 * chart.metresPerPixel(boat.positionValid ? boat.latitude : 47) / 1852
         text: "100 px = " + (nm < 0.1 ? (nm * 1852).toFixed(0) + " m" : nm.toFixed(2) + " sm") + "   Z" + chart.zoom
-        color: "black"
+        color: Theme.overlayText
         style: Text.Outline
-        styleColor: "white"
+        styleColor: Theme.overlayOutline
         font.pixelSize: 16
     }
 
@@ -227,9 +227,9 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 4
         text: chart.layers.length > 0 ? "© OpenStreetMap-Mitwirkende, OpenSeaMap" : "Keine Karte geladen – siehe docs/charts.md"
-        color: "black"
+        color: Theme.overlayText
         style: Text.Outline
-        styleColor: "white"
+        styleColor: Theme.overlayOutline
         font.pixelSize: 12
     }
 

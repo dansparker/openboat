@@ -19,4 +19,12 @@ QtObject {
     readonly property color anchor: night ? "#c03030" : "#ff9c00"
     readonly property string mono: "monospace"
     readonly property real chartDimming: night ? 0.35 : 1.0
+    readonly property color water: night ? "#0a0404" : "#a8c8e0"  // where no chart tile exists
+    readonly property color button: night ? "#140000" : "#262626"
+    readonly property color buttonPressed: night ? "#300000" : "#505050"
+    readonly property color buttonChecked: night ? "#3a0000" : "#00506a"
+    readonly property color buttonBorder: night ? "#501010" : "#606060"
+    readonly property color buttonBorderChecked: night ? "#c03030" : "#00c8ff"
+    readonly property color overlayText: night ? "#c03030" : "black"
+    readonly property color overlayOutline: night ? "black" : "white"
 }

@@ -10,6 +10,15 @@ funktional angelehnt an Geräte wie den Garmin GPSMAP 9000xsv. Schwesterprojekt 
 > Seekarten, ECDIS oder ordentliche Seemannschaft. Die freien Karten können veraltet, lückenhaft
 > oder falsch sein. Immer eine unabhängige Navigationsmöglichkeit an Bord haben.
 
+![OpenBoat – Simulator, Tagmodus](docs/screenshots/day.png)
+
+<details><summary>Nachtmodus</summary>
+
+![OpenBoat – Nachtmodus](docs/screenshots/night.png)
+</details>
+
+Die Screenshots erzeugt die CI bei jedem Lauf (Artefakt „screenshots“).
+
 ## Vorbild und Stand
 
 | GPSMAP 9000xsv | OpenBoat | Stand |

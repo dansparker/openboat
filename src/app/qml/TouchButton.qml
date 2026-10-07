@@ -14,14 +14,14 @@ Rectangle {
     implicitWidth: Math.max(64, label.implicitWidth + 28)
     implicitHeight: 56
     radius: 6
-    color: mouse.pressed ? "#505050" : checked ? "#00506a" : "#262626"
-    border.color: checked ? "#00c8ff" : "#606060"
+    color: mouse.pressed ? Theme.buttonPressed : checked ? Theme.buttonChecked : Theme.button
+    border.color: checked ? Theme.buttonBorderChecked : Theme.buttonBorder
     border.width: 2
 
     Text {
         id: label
         anchors.centerIn: parent
-        color: "white"
+        color: Theme.text
         font.pixelSize: button.fontSize
         font.bold: true
     }
