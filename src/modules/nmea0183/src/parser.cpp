@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "boat/core/heading.hpp"
 #include "boat/core/marine_data.hpp"
 #include "boat/core/nav_math.hpp"
 
@@ -196,20 +197,12 @@ bool Parser::feed(std::string_view raw) {
             std::optional<double> var;
             if (const auto v = num(field(4))) var = field(5) == "W" ? -*v : *v;
             if (!var) var = last_variation_deg_;
-            core::Heading hdg;
-            hdg.variation_deg = var;
-            hdg.is_true = var.has_value();
-            hdg.heading_deg = core::normalize_deg(mag + var.value_or(0.0));
-            bus_.publish(hdg);
+            bus_.publish(core::magnetic_heading(mag, var, bus_));
             ok = true;
         }
     } else if (type == "HDM") {
         if (const auto h = num(field(1))) {
-            core::Heading hdg;
-            hdg.variation_deg = last_variation_deg_;
-            hdg.is_true = last_variation_deg_.has_value();
-            hdg.heading_deg = core::normalize_deg(*h + last_variation_deg_.value_or(0.0));
-            bus_.publish(hdg);
+            bus_.publish(core::magnetic_heading(*h, last_variation_deg_, bus_));
             ok = true;
         }
     } else if (type == "DPT") {

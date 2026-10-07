@@ -6,6 +6,7 @@
 #include <numbers>
 
 #include "boat/core/data_bus.hpp"
+#include "boat/core/heading.hpp"
 #include "boat/core/nav_math.hpp"
 
 namespace boat::sim {
@@ -16,6 +17,7 @@ constexpr core::GeoPoint kCentre{47.8700, 13.5450};  // Attersee
 constexpr double kRadiusM = 900.0;
 constexpr double kSpeedMps = 5.0 * core::kMpsPerKnot;
 constexpr double kTrueWindFromDeg = 300.0;
+constexpr double kVariationDeg = 5.0;  // about the WMM value at the Attersee
 constexpr double kTrueWindMps = 12.0 * core::kMpsPerKnot;
 constexpr double kDeg = std::numbers::pi / 180.0;
 
@@ -32,7 +34,7 @@ SimState simulate(double t) {
     s.position.hdop = 0.8;
     const double course = core::normalize_deg(bearing + 90.0);
     s.cog = {course, kSpeedMps};
-    s.heading = {core::normalize_deg(course - 3.0), true, 4.5};  // 3 deg leeway
+    s.heading = {core::normalize_deg(course - 3.0), true, std::nullopt, false};  // 3 deg leeway
     s.stw = {kSpeedMps * 0.97};
     // Depth: shelf near the shore (north), deep water elsewhere
     s.depth = {std::max(1.2, 25.0 + 22.0 * std::cos(bearing * kDeg)), -0.4};
@@ -57,6 +59,21 @@ SimState simulate(double t) {
     s.ais.sog_mps = 8.0 * core::kMpsPerKnot;
     s.ais.heading_deg = 180.0;
     s.ais.position = core::destination(core::destination(kCentre, 0.0, 1800.0), 180.0, leg * *s.ais.sog_mps);
+
+    s.anchored.mmsi = 203888456;
+    s.anchored.class_b = true;
+    s.anchored.name = "SY WINDROSE";
+    s.anchored.ship_type = 36;  // sailing
+    s.anchored.length_m = 9.0;
+    s.anchored.beam_m = 3.0;
+    s.anchored.sog_mps = 0.0;
+    s.anchored.cog_deg = 0.0;
+    s.anchored.position = core::destination(kCentre, 60.0, 1700.0);
+
+    s.beacon.mmsi = 972000123;
+    s.beacon.nav_status = 15;  // test
+    s.beacon.sog_mps = 0.0;
+    s.beacon.position = core::destination(kCentre, 200.0, 1400.0);
     return s;
 }
 
@@ -76,7 +93,9 @@ void Simulator::start(core::DataBus& bus) {
                                           .count()});
             bus.publish(s.position);
             bus.publish(s.cog);
-            bus.publish(s.heading);
+            // The simulated compass is magnetic and sends no variation (like many
+            // fluxgate compasses): the nav module adds it from the World Magnetic Model
+            bus.publish(core::magnetic_heading(s.heading.heading_deg - kVariationDeg, std::nullopt, bus));
             bus.publish(s.stw);
             core::Depth depth = s.depth;  // the simulated transducer sends an offset; the user may override it
             const auto user = bus.latest<core::DepthOffset>();
@@ -86,6 +105,10 @@ void Simulator::start(core::DataBus& bus) {
             bus.publish(s.wind);
             bus.publish(s.water);
             if (tick % 10 == 0) bus.publish(s.ais);  // AIS: every 2 s like a class A at speed
+            if (tick % 50 == 0) {                    // slow / anchored: rarely
+                bus.publish(s.anchored);
+                bus.publish(s.beacon);
+            }
             ++tick;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }

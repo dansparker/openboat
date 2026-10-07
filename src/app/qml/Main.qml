@@ -14,6 +14,7 @@ Window {
         chartView.setZoom(startZoom);
         navPage.visible = startPage === "routes";
         settingsPage.visible = startPage === "settings";
+        aisPage.visible = startPage === "ais";
     }
 
     RowLayout {
@@ -41,7 +42,18 @@ Window {
                 }
                 onTapped: (lat, lon) => {
                     menu.visible = false;
-                    if (editing) editPoints = editPoints.concat([{ lat: lat, lon: lon }]);
+                    if (editing) {
+                        editPoints = editPoints.concat([{ lat: lat, lon: lon }]);
+                        return;
+                    }
+                    // Tap on an AIS target: its details in the AIS list
+                    const t = aisAt(lat, lon);
+                    if (t) {
+                        navPage.visible = false;
+                        settingsPage.visible = false;
+                        aisPage.selected = t.mmsi;
+                        aisPage.visible = true;
+                    }
                 }
             }
 
@@ -136,6 +148,16 @@ Window {
                 onNewRoute: { visible = false; chartView.editPoints = []; chartView.editing = true; }
             }
 
+            AisPage {
+                id: aisPage
+                visible: false
+                anchors.fill: parent
+                anchors.margins: 30
+                anchors.topMargin: alarmBanner.visible ? alarmBanner.height + 28 : 30
+                onCloseRequested: visible = false
+                onShowOnChart: (lat, lon) => { visible = false; chartView.centreOn(lat, lon); }
+            }
+
             // Over the chart only (never over the MOB key and the side panel), at the
             // top: the chart centre is where the own boat is drawn when following.
             AlarmBanner {
@@ -211,14 +233,22 @@ Window {
                     fontSize: 14
                     text: "Routen/Tracks"
                     checked: navPage.visible
-                    onClicked: { settingsPage.visible = false; navPage.visible = !navPage.visible; }
+                    onClicked: { settingsPage.visible = false; aisPage.visible = false; navPage.visible = !navPage.visible; }
                 }
                 TouchButton {
                     Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
                     text: "Setup"
                     checked: settingsPage.visible
-                    onClicked: { navPage.visible = false; settingsPage.visible = !settingsPage.visible; }
+                    onClicked: { navPage.visible = false; aisPage.visible = false; settingsPage.visible = !settingsPage.visible; }
+                }
+                TouchButton {
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
+                    fontSize: 16
+                    text: "AIS-Ziele (" + boat.aisTargets.length + ")"
+                    checked: aisPage.visible
+                    onClicked: { navPage.visible = false; settingsPage.visible = false; aisPage.selected = 0; aisPage.visible = !aisPage.visible; }
                 }
                 TouchButton {
                     Layout.columnSpan: 2

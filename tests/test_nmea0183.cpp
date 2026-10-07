@@ -68,6 +68,24 @@ TEST(Nmea0183, HdmWithoutVariationStaysMagnetic) {
     EXPECT_FALSE(h->value.is_true);
 }
 
+TEST(Nmea0183, HdmUsesModelVariationWhenTheDeviceSendsNone) {
+    core::DataBus bus;
+    nmea0183::Parser p(bus);
+    bus.publish(core::MagneticVariation{4.8, "WMM-2025"});
+    p.feed(with_checksum("$HCHDM,200.0,M"));
+    auto h = bus.latest<core::Heading>();
+    ASSERT_TRUE(h);
+    EXPECT_TRUE(h->value.is_true);
+    EXPECT_TRUE(h->value.variation_from_model);
+    EXPECT_NEAR(h->value.heading_deg, 204.8, 1e-9);
+    // a variation from the device (RMC) wins over the model
+    p.feed(with_checksum("$GPRMC,120000,A,4752.200,N,01332.700,E,5.0,90.0,011026,3.0,E"));
+    p.feed(with_checksum("$HCHDM,200.0,M"));
+    h = bus.latest<core::Heading>();
+    EXPECT_FALSE(h->value.variation_from_model);
+    EXPECT_NEAR(h->value.heading_deg, 203.0, 1e-9);
+}
+
 TEST(Nmea0183, DptUsesSentenceOffsetDbtUsesConfigured) {
     core::DataBus bus;
     nmea0183::Parser p(bus, {.depth_offset_m = -0.5});

@@ -1,4 +1,4 @@
-add_library(boat_nav src/nav.cpp src/route.cpp)
+add_library(boat_nav src/nav.cpp src/route.cpp src/magnetic_model.cpp)
 add_library(boat::nav ALIAS boat_nav)
 target_include_directories(boat_nav PUBLIC include)
 target_link_libraries(boat_nav PUBLIC boat::core)

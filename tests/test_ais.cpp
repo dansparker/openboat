@@ -19,6 +19,7 @@ TEST(Ais, Type1PositionReport) {
     EXPECT_NEAR(*r->sog_mps, 0.0, 1e-9);
     EXPECT_NEAR(*r->heading_deg, 181.0, 1e-9);
     EXPECT_FALSE(r->class_b);
+    EXPECT_EQ(r->nav_status, 5);  // moored
 }
 
 TEST(Ais, Type5TwoFragmentsViaParser) {

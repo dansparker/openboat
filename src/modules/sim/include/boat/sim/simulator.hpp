@@ -21,6 +21,8 @@ struct SimState {
     core::ApparentWind wind;
     core::WaterTemperature water;
     core::AisReport ais;
+    core::AisReport anchored;  // sailing boat at anchor (class B)
+    core::AisReport beacon;    // MOB device in TEST mode: listed, no alarm
 };
 
 // Deterministic state at time t (seconds since start) - used by the module

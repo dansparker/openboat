@@ -77,6 +77,22 @@ Item {
         centerX = worldX(boat.longitude) + lookAhead * Math.sin(r);
         centerY = worldY(boat.latitude) - lookAhead * Math.cos(r);
     }
+    // Shows a position (AIS target, waypoint) without following the boat
+    function centreOn(lat, lon) {
+        follow = false;
+        centerX = worldX(lon);
+        centerY = worldY(lat);
+        overlay.requestPaint();
+    }
+    // AIS target within a finger's width of a position (tap), else null
+    function aisAt(lat, lon) {
+        let best = null, bestD = 30;
+        for (const t of boat.aisTargets) {
+            const d = Math.hypot(worldX(t.lon) - worldX(lon), worldY(t.lat) - worldY(lat));
+            if (d < bestD) { best = t; bestD = d; }
+        }
+        return best;
+    }
     function setZoom(z) {
         z = Math.max(minZoom, Math.min(maxZoom, z));
         if (z === zoom) return;
@@ -335,6 +351,20 @@ Item {
             // AIS targets: triangle + COG vector
             for (const t of boat.aisTargets) {
                 const x = chart.screenX(t.lon), y = chart.screenY(t.lat);
+                if (t.kind !== "vessel") {
+                    // Emergency beacon (S-52 style): red circle with a cross
+                    const c = t.beaconTest ? String(Theme.aisLost) : String(Theme.danger);
+                    ctx.strokeStyle = c;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 11, 0, 2 * Math.PI);
+                    ctx.moveTo(x - 8, y - 8); ctx.lineTo(x + 8, y + 8);
+                    ctx.moveTo(x + 8, y - 8); ctx.lineTo(x - 8, y + 8);
+                    ctx.stroke();
+                    texts.push({ x: x, y: y, dx: 16, dy: 0, text: t.kind === "sart" ? "AIS-SART" : t.kind === "mob" ? "MOB" : "EPIRB",
+                                 font: "bold 14px sans-serif", colour: c, align: "left" });
+                    continue;
+                }
                 const colour = t.dangerous ? String(Theme.danger) : t.lost ? String(Theme.aisLost) : String(Theme.ais);
                 ctx.strokeStyle = colour;
                 ctx.fillStyle = colour;

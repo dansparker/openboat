@@ -67,6 +67,7 @@ public:
 
 private:
     core::DataBus& bus_;
+    std::optional<double> last_variation_deg_;  // PGN 127258
     DecoderOptions options_;
     FastPacketAssembler fast_;
 };

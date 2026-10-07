@@ -10,6 +10,7 @@ set(BOAT_QML_FILES
     qml/AlarmBanner.qml
     qml/NavStrip.qml
     qml/NavPage.qml
+    qml/AisPage.qml
     qml/SettingsPage.qml
     qml/TouchButton.qml)
 

@@ -203,6 +203,15 @@ Rectangle {
                 }
 
                 Heading { text: "Navigation & Karte" }
+                Text {
+                    width: content.width
+                    wrapMode: Text.WordWrap
+                    color: Theme.label
+                    font.pixelSize: 14
+                    // Read only: the device value wins, otherwise the World Magnetic Model
+                    text: "Missweisung: " + (boat.variationText !== "" ? boat.variationText
+                          : "unbekannt – Kompasskurse bleiben missweisend (HDG mag)")
+                }
                 ChoiceRow {
                     label: "Ausrichtung"
                     options: [{ value: "north", text: "Nord oben" }, { value: "course", text: "Kurs oben" }]

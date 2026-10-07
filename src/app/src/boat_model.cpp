@@ -3,6 +3,7 @@
 #include <QVariantMap>
 
 #include <chrono>
+#include <cmath>
 
 #include "boat/core/marine_data.hpp"
 #include "boat/core/nav_math.hpp"
@@ -73,6 +74,22 @@ void BoatModel::poll() {
         heading_ = hdg->heading_deg;
         heading_true_ = hdg->is_true;
     }
+    {
+        const auto model = fresh<core::MagneticVariation>(bus_, 5min);
+        std::optional<double> var;
+        QString source;
+        if (hdg && hdg->variation_deg && !hdg->variation_from_model) {
+            var = hdg->variation_deg;
+            source = QStringLiteral("Gerät");
+        } else if (model) {
+            var = model->variation_deg;
+            source = QString::fromStdString(model->model);
+        }
+        variation_text_ = var ? QStringLiteral("%1° %2 (%3)")
+                                    .arg(std::abs(*var), 0, 'f', 1)
+                                    .arg(*var >= 0 ? QStringLiteral("O") : QStringLiteral("W"), source)
+                              : QString();
+    }
     const auto stw = fresh<core::SpeedThroughWater>(bus_, 3s);
     stw_valid_ = stw.has_value();
     if (stw) stw_kn_ = stw->stw_mps * kKnPerMps;
@@ -130,6 +147,20 @@ void BoatModel::poll() {
             m[QStringLiteral("cpaNm")] = t.cpa_m ? *t.cpa_m / core::kMetresPerNm : -1.0;
             m[QStringLiteral("tcpaMin")] = t.tcpa_s ? *t.tcpa_s / 60.0 : -1.0;
             m[QStringLiteral("dangerous")] = t.dangerous;
+            m[QStringLiteral("bearing")] = t.bearing_deg.value_or(-1.0);
+            m[QStringLiteral("heading")] = t.data.heading_deg.value_or(-1.0);
+            m[QStringLiteral("hasCog")] = t.data.cog_deg.has_value();
+            m[QStringLiteral("callsign")] = t.data.callsign ? QString::fromStdString(*t.data.callsign) : QString();
+            m[QStringLiteral("shipType")] = static_cast<int>(t.data.ship_type);
+            m[QStringLiteral("lengthM")] = t.data.length_m.value_or(0.0);
+            m[QStringLiteral("beamM")] = t.data.beam_m.value_or(0.0);
+            m[QStringLiteral("navStatus")] = t.data.nav_status ? static_cast<int>(*t.data.nav_status) : -1;
+            m[QStringLiteral("ageS")] = std::chrono::duration<double>(core::Clock::now() - t.last_position).count();
+            m[QStringLiteral("kind")] = t.kind == boat::nav::AisKind::Sart  ? QStringLiteral("sart")
+                                        : t.kind == boat::nav::AisKind::Mob  ? QStringLiteral("mob")
+                                        : t.kind == boat::nav::AisKind::Epirb ? QStringLiteral("epirb")
+                                                                              : QStringLiteral("vessel");
+            m[QStringLiteral("beaconTest")] = t.beacon_test;
             m[QStringLiteral("lost")] = t.lost;
             m[QStringLiteral("classB")] = t.data.class_b;
             ais_.append(m);

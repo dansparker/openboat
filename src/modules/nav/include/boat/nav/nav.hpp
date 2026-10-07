@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -20,6 +21,7 @@
 #include "boat/core/data_bus.hpp"
 #include "boat/core/marine_data.hpp"
 #include "boat/core/module.hpp"
+#include "boat/nav/magnetic_model.hpp"
 #include "boat/nav/route.hpp"
 
 namespace boat::nav {
@@ -28,8 +30,17 @@ using core::Clock;
 
 // ---- AIS --------------------------------------------------------------------
 
+// What sends: a ship, or an emergency beacon (by MMSI, ITU-R M.585):
+// 970xxxxxx AIS-SART (life raft), 972xxxxxx MOB device, 974xxxxxx EPIRB-AIS
+enum class AisKind : std::uint8_t { Vessel, Sart, Mob, Epirb };
+
+[[nodiscard]] AisKind ais_kind(std::uint32_t mmsi);
+
 struct AisTarget {
     core::AisReport data;  // merged position + static data
+    AisKind kind = AisKind::Vessel;
+    // Beacon in test mode (navigational status 15): listed, no alarm
+    bool beacon_test = false;
     Clock::time_point last_position{};
     std::optional<double> range_m;
     std::optional<double> bearing_deg;
@@ -68,7 +79,8 @@ private:
 
 // ---- Alarms -----------------------------------------------------------------
 
-enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival, Mob };
+// Values are shown by the UI: append only
+enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival, Mob, AisBeacon };
 
 // Alarm: immediate danger, continuous fast beeping until acknowledged.
 // Warning: degraded information, short double beep every few seconds.
@@ -152,12 +164,20 @@ struct NavSettings {
 // Publishing NavSettings on the bus (from the settings page) replaces the
 // running module's settings immediately.
 
+// Variation at a position and time from the model; nullopt when the model
+// is outside its validity (5 years) - an outdated model is not used.
+[[nodiscard]] std::optional<core::MagneticVariation> variation_at(const MagneticModel& model,
+                                                                  const core::GeoPoint& p, std::int64_t unix_ms);
+
 // Alarms raised by waypoint navigation (arrival, MOB).
 [[nodiscard]] std::vector<Alarm> guidance_alarms(const Guidance& g);
 
 class NavModule final : public core::Module {
 public:
-    explicit NavModule(NavSettings settings = {}) : settings_(settings) {}
+    // magnetic_model: optional; with it the variation at the own position is
+    // published (MagneticVariation) for compasses that send none.
+    explicit NavModule(NavSettings settings = {}, std::shared_ptr<const MagneticModel> magnetic_model = nullptr)
+        : settings_(settings), magnetic_model_(std::move(magnetic_model)) {}
     ~NavModule() override;
 
     [[nodiscard]] std::string_view name() const override { return "nav"; }
@@ -166,6 +186,7 @@ public:
 
 private:
     NavSettings settings_;
+    std::shared_ptr<const MagneticModel> magnetic_model_;
     std::atomic<bool> running_{false};
     std::thread worker_;
     std::optional<core::SubscriptionId> wind_subscription_;

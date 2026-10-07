@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <exception>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 Q_IMPORT_QML_PLUGIN(OpenBoatPlugin)
@@ -58,6 +59,23 @@ QJsonObject load_config(const QString& path) {
 }
 
 // Relative paths in the config are relative to the config file
+// World Magnetic Model for compasses that send no variation. Missing or
+// broken: headings from such compasses stay magnetic (shown as "HDG (mag)").
+std::shared_ptr<const boat::nav::MagneticModel> load_magnetic_model(const QString& path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "OpenBoat: no magnetic model at" << path << "- magnetic headings without variation stay magnetic";
+        return nullptr;
+    }
+    std::istringstream in(file.readAll().toStdString());
+    try {
+        return std::make_shared<const boat::nav::MagneticModel>(boat::nav::MagneticModel::from_cof(in));
+    } catch (const std::exception& e) {
+        qWarning() << "OpenBoat: magnetic model" << path << "unusable:" << e.what();
+        return nullptr;
+    }
+}
+
 QString resolve(const QString& base_dir, const QString& path) {
     return QFileInfo(path).isAbsolute() ? path : QDir(base_dir).filePath(path);
 }
@@ -127,7 +145,7 @@ int main(int argc, char* argv[]) {
                                  QStringLiteral("ms"), QStringLiteral("8000"));
     QCommandLineOption demo_opt(QStringLiteral("demo"),
                                 QStringLiteral("Start a demo route near the simulator (screenshots, trying out)"));
-    QCommandLineOption page_opt(QStringLiteral("page"), QStringLiteral("Open a page at start: routes | settings"),
+    QCommandLineOption page_opt(QStringLiteral("page"), QStringLiteral("Open a page at start: routes | settings | ais"),
                                 QStringLiteral("page"));
     QCommandLineOption zoom_opt(QStringLiteral("zoom"), QStringLiteral("Initial chart zoom level (3..18)"),
                                 QStringLiteral("level"), QStringLiteral("14"));
@@ -143,7 +161,8 @@ int main(int argc, char* argv[]) {
 
     // User settings (settings page) on top of the configuration defaults
     Settings settings(bus, resolve(base_dir, config.value("settings_file").toString("settings.json")), config);
-    modules.push_back(std::make_unique<boat::nav::NavModule>(settings.navSettings()));
+    modules.push_back(std::make_unique<boat::nav::NavModule>(
+        settings.navSettings(), load_magnetic_model(resolve(base_dir, config.value("magnetic_model").toString("../data/WMM.COF")))));
 
     boat::track::TrackConfig track;
     track.dir = resolve(base_dir, config.value("track_dir").toString("tracks")).toStdString();

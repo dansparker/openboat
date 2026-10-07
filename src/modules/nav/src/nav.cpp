@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <mutex>
+#include <utility>
 #include <sstream>
 
 #include "boat/core/nav_math.hpp"
@@ -18,10 +19,24 @@ double seconds(Clock::duration d) { return std::chrono::duration<double>(d).coun
 
 // ---- AisTable ---------------------------------------------------------------
 
+AisKind ais_kind(std::uint32_t mmsi) {
+    switch (mmsi / 1000000) {
+        case 970: return AisKind::Sart;
+        case 972: return AisKind::Mob;
+        case 974: return AisKind::Epirb;
+        default: return AisKind::Vessel;
+    }
+}
+
 void AisTable::update(const core::AisReport& r, Clock::time_point now) {
     AisTarget& t = targets_[r.mmsi];
     core::AisReport& d = t.data;
     d.mmsi = r.mmsi;
+    t.kind = ais_kind(r.mmsi);
+    if (r.nav_status) {
+        d.nav_status = r.nav_status;
+        t.beacon_test = t.kind != AisKind::Vessel && *r.nav_status == 15;
+    }
     d.class_b = d.class_b || r.class_b;
     // Position reports and static reports arrive separately: merge them
     if (r.position) {
@@ -77,7 +92,12 @@ AisTargetList AisTable::evaluate(const std::optional<core::Position>& own,
         list.targets.push_back(t);
         ++it;
     }
-    std::sort(list.targets.begin(), list.targets.end(), [](const AisTarget& a, const AisTarget& b) {
+    // Emergency beacons first, then collision danger, then by range
+    const auto rank = [](const AisTarget& t) {
+        return t.kind != AisKind::Vessel && !t.beacon_test ? 0 : t.dangerous ? 1 : 2;
+    };
+    std::sort(list.targets.begin(), list.targets.end(), [&](const AisTarget& a, const AisTarget& b) {
+        if (rank(a) != rank(b)) return rank(a) < rank(b);
         return a.range_m.value_or(1e12) < b.range_m.value_or(1e12);
     });
     return list;
@@ -139,6 +159,19 @@ AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Positi
     }
 
     for (const auto& t : ais.targets) {
+        // Emergency beacon (life raft, person in the water): always an alarm,
+        // whatever the CPA - the skipper decides whether to assist
+        if (t.kind != AisKind::Vessel && !t.beacon_test && !t.lost) {
+            std::ostringstream s;
+            s << (t.kind == AisKind::Sart ? "AIS-SART aktiv" : t.kind == AisKind::Mob ? "AIS-MOB-Sender aktiv" : "AIS-EPIRB aktiv");
+            if (t.range_m && t.bearing_deg) {
+                s.precision(2);
+                s << std::fixed << ": " << *t.range_m / core::kMetresPerNm << " sm, "
+                  << static_cast<int>(std::lround(*t.bearing_deg)) << "°";
+            }
+            out.active.push_back({AlarmId::AisBeacon, s.str(), t.data.mmsi});
+            continue;
+        }
         if (!t.dangerous) continue;
         std::ostringstream s;
         s << "AIS-Kollisionsgefahr: " << (t.data.name ? *t.data.name : std::to_string(t.data.mmsi));
@@ -180,6 +213,19 @@ std::vector<Alarm> guidance_alarms(const Guidance& g) {
     return out;
 }
 
+// ---- Magnetic variation -------------------------------------------------------
+
+std::optional<core::MagneticVariation> variation_at(const MagneticModel& model, const core::GeoPoint& p,
+                                                    std::int64_t unix_ms) {
+    using namespace std::chrono;
+    const sys_days day = floor<days>(sys_time<milliseconds>(milliseconds(unix_ms)));
+    const year_month_day ymd{day};
+    const double year = decimal_year(static_cast<int>(ymd.year()), static_cast<int>(static_cast<unsigned>(ymd.month())),
+                                     static_cast<int>(static_cast<unsigned>(ymd.day())));
+    if (!model.valid_for(year)) return std::nullopt;
+    return core::MagneticVariation{model.declination_deg(p, 0.0, year), model.name()};
+}
+
 // ---- NavModule --------------------------------------------------------------
 
 NavModule::~NavModule() { stop(); }
@@ -215,6 +261,8 @@ void NavModule::start(core::DataBus& bus) {
         Navigator navigator(settings_.navigator);
         bool acknowledge = false;
         std::optional<NavSettings> new_settings;
+        std::optional<core::GeoPoint> variation_point;
+        Clock::time_point variation_time{};
         const auto ais_sub = bus.topic<core::AisReport>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
             reports.push_back(s.value);
@@ -274,6 +322,20 @@ void NavModule::start(core::DataBus& bus) {
             bus.publish(guidance);
             bus.publish(alarms.evaluate(own, bus.latest<core::Depth>(), list, now, guidance_alarms(guidance)));
             bus.publish(alarms.anchor());
+            // Variation changes slowly: once a minute or after 10 km is plenty
+            if (magnetic_model_ && own_fresh &&
+                (!variation_point || now - variation_time > std::chrono::minutes(1) ||
+                 core::distance_m(*variation_point, own->value.point) > 10000.0)) {
+                // GNSS time (the Pi has no clock); system time only as a fallback
+                std::int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::system_clock::now().time_since_epoch()).count();
+                if (const auto t = bus.latest<core::UtcTime>(); t && core::is_fresh(*t, std::chrono::seconds(10), now)) {
+                    ms = t->value.unix_ms;
+                }
+                if (const auto v = variation_at(*magnetic_model_, own->value.point, ms)) bus.publish(*v);
+                variation_point = own->value.point;
+                variation_time = now;
+            }
             for (int i = 0; running_ && i < 10; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         bus.topic<core::AisReport>().unsubscribe(ais_sub);

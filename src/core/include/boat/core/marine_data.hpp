@@ -43,10 +43,20 @@ struct CourseOverGround {
 
 // Heading from a compass. Magnetic heading is converted to true by the
 // producer when the variation is known; otherwise `is_true` stays false.
+// Variation: from the device (RMC, HDG, PGN 127250/127258) if it sends one,
+// otherwise from the World Magnetic Model (MagneticVariation below).
 struct Heading {
     double heading_deg = 0.0;
     bool is_true = false;
     std::optional<double> variation_deg;  // east positive
+    bool variation_from_model = false;
+};
+
+// Magnetic variation at the own position from the World Magnetic Model
+// (published by the nav module about once a minute; east positive).
+struct MagneticVariation {
+    double variation_deg = 0.0;
+    std::string model;  // e.g. "WMM-2025"
 };
 
 // Speed through water (paddle wheel / log).
@@ -119,6 +129,9 @@ struct AisReport {
     std::optional<double> length_m;
     std::optional<double> beam_m;
     std::uint8_t ship_type = 0;
+    // Navigational status (class A position reports): 14 = AIS-SART active,
+    // 15 = undefined (also used by SART/MOB devices in test mode)
+    std::optional<std::uint8_t> nav_status;
     bool class_b = false;
 };
 

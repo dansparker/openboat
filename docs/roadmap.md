@@ -5,7 +5,7 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 ## v0.2 – sicher benutzbar
 - ~~Akustischer Alarm~~ ✅ (Lautsprecher über Qt Multimedia, GPIO-Summer über `buzzer` in der Konfiguration)
 - ~~Einstellungsseite~~ ✅ inkl. Tiefenoffset (vom Geber / manuell, wirkt sofort)
-- Missweisung aus Weltmagnetfeldmodell (WMM, aus OpenEFIS übernehmbar), wenn kein Gerät sie liefert
+- ~~Missweisung aus Weltmagnetfeldmodell (WMM), wenn kein Gerät sie liefert~~ ✅ (WMM2025 bis Ende 2029; danach neue WMM.COF von NOAA einspielen)
 - ~~Overzoom~~ ✅ (mit Warnhinweis, abschaltbar), ~~Kursoben-Darstellung~~ ✅
 - ~~Track-Aufzeichnung (GPX)~~ ✅, ~~Tracks früherer Tage~~ ✅; offen: Logbuch-Ansicht, NMEA-Mitschnitt für Replay
 - Raspberry-Pi-Image mit schreibgeschütztem Root-Dateisystem (wie OpenEFIS `image/`)
@@ -13,7 +13,7 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 ## v0.3 – Navigation
 - ~~Wegpunkte, Routen, Go-To mit XTE, BTW/DTW, ETA; MOB-Taste~~ ✅
 - Routen bearbeiten (Punkte verschieben/einfügen), GPX-Import/-Export über USB-Stick
-- AIS-Zielliste und Detailansicht, AIS-SART/MOB-Erkennung (MMSI 970/972/974)
+- ~~AIS-Zielliste und Detailansicht, AIS-SART/MOB-Erkennung (MMSI 970/972/974)~~ ✅; offen: Sicherheitsmeldungen (Typ 14, z. B. „SART ACTIVE“), Basisstationen/AtoN (Typ 4/21)
 - ~~Ausgabe von RMB/APB (NMEA 0183) für Autopiloten~~ ✅ (Test an echten Autopiloten offen)
 - Routenprüfung gegen Untiefen (braucht Tiefendaten, v0.4)
 

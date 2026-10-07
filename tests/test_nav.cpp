@@ -158,3 +158,45 @@ TEST(Buzzer, Patterns) {
     EXPECT_TRUE(nav::buzzer_on(nav::AlarmLevel::Warning, 0.35));
     EXPECT_FALSE(nav::buzzer_on(nav::AlarmLevel::Warning, 2.0));
 }
+
+TEST(AisTable, BeaconsAreRecognisedAndListedFirst) {
+    EXPECT_EQ(nav::ais_kind(970123456), nav::AisKind::Sart);
+    EXPECT_EQ(nav::ais_kind(972123456), nav::AisKind::Mob);
+    EXPECT_EQ(nav::ais_kind(974123456), nav::AisKind::Epirb);
+    EXPECT_EQ(nav::ais_kind(211234560), nav::AisKind::Vessel);
+
+    nav::AisTable table;
+    const auto now = core::Clock::now();
+    core::AisReport ship;
+    ship.mmsi = 211234560;
+    ship.position = core::destination(kHome, 90.0, 300.0);
+    table.update(ship, now);
+    core::AisReport sart;
+    sart.mmsi = 970123456;
+    sart.position = core::destination(kHome, 0.0, 3000.0);
+    sart.nav_status = 14;
+    table.update(sart, now);
+    const auto list = table.evaluate(fix(kHome, now).value, std::nullopt, now);
+    ASSERT_EQ(list.targets.size(), 2U);
+    EXPECT_EQ(list.targets[0].kind, nav::AisKind::Sart);  // farther away, but first
+
+    nav::AlarmEvaluator e;
+    const auto alarms = e.evaluate(fix(kHome, now), std::nullopt, list, now);
+    ASSERT_TRUE(has(alarms, nav::AlarmId::AisBeacon));
+    EXPECT_EQ(alarms.sound, nav::AlarmLevel::Alarm);
+}
+
+TEST(AisTable, BeaconInTestModeDoesNotAlarm) {
+    nav::AisTable table;
+    const auto now = core::Clock::now();
+    core::AisReport sart;
+    sart.mmsi = 972000001;
+    sart.position = kHome;
+    sart.nav_status = 15;  // test
+    table.update(sart, now);
+    const auto list = table.evaluate(fix(kHome, now).value, std::nullopt, now);
+    ASSERT_EQ(list.targets.size(), 1U);
+    EXPECT_TRUE(list.targets[0].beacon_test);
+    nav::AlarmEvaluator e;
+    EXPECT_FALSE(has(e.evaluate(fix(kHome, now), std::nullopt, list, now), nav::AlarmId::AisBeacon));
+}

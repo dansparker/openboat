@@ -23,6 +23,8 @@ class BoatModel : public QObject {
     Q_PROPERTY(bool headingValid READ headingValid NOTIFY changed)
     Q_PROPERTY(bool headingTrue READ headingTrue NOTIFY changed)
     Q_PROPERTY(double heading READ heading NOTIFY changed)
+    // Magnetic variation in use, e.g. "4.9° O (WMM-2025)" / "3.0° O (Gerät)"; empty = none
+    Q_PROPERTY(QString variationText READ variationText NOTIFY changed)
     Q_PROPERTY(bool stwValid READ stwValid NOTIFY changed)
     Q_PROPERTY(double stwKn READ stwKn NOTIFY changed)
     Q_PROPERTY(bool depthValid READ depthValid NOTIFY changed)
@@ -73,6 +75,7 @@ public:
     bool headingValid() const { return heading_valid_; }
     bool headingTrue() const { return heading_true_; }
     double heading() const { return heading_; }
+    QString variationText() const { return variation_text_; }
     bool stwValid() const { return stw_valid_; }
     double stwKn() const { return stw_kn_; }
     bool depthValid() const { return depth_valid_; }
@@ -125,6 +128,7 @@ private:
     double cog_ = 0.0, sog_kn_ = 0.0;
     bool heading_valid_ = false, heading_true_ = false;
     double heading_ = 0.0;
+    QString variation_text_;
     bool stw_valid_ = false;
     double stw_kn_ = 0.0;
     bool depth_valid_ = false;

@@ -2,6 +2,7 @@
 
 #include <numbers>
 
+#include "boat/core/heading.hpp"
 #include "boat/core/marine_data.hpp"
 #include "boat/core/nav_math.hpp"
 
@@ -165,16 +166,19 @@ bool Decoder::decode(const Message& m) {
             if (!hdg) return false;
             const auto var = r.s16(5);
             const bool magnetic = (r.u8(7) & 0x03) == 1;
-            core::Heading h;
-            if (var) h.variation_deg = *var * 1e-4 * kRadToDeg;
+            std::optional<double> variation = last_variation_deg_;
+            if (var) variation = *var * 1e-4 * kRadToDeg;
             if (magnetic) {
-                h.is_true = h.variation_deg.has_value();
-                h.heading_deg = core::normalize_deg(*hdg + h.variation_deg.value_or(0.0));
+                bus_.publish(core::magnetic_heading(*hdg, variation, bus_));
             } else {
-                h.is_true = true;
-                h.heading_deg = *hdg;
+                bus_.publish(core::Heading{*hdg, true, variation, false});
             }
-            bus_.publish(h);
+            return true;
+        }
+        case 127258: {  // Magnetic variation (e.g. from the GNSS); used for magnetic headings
+            const auto var = r.s16(4);
+            if (!var) return false;
+            last_variation_deg_ = *var * 1e-4 * kRadToDeg;
             return true;
         }
         case 128267: {  // Water depth
@@ -251,6 +255,9 @@ bool Decoder::decode(const Message& m) {
             a.cog_deg = angle_deg(r.u16(14));
             if (const auto sog = r.u16(16)) a.sog_mps = *sog * 0.01;
             a.heading_deg = angle_deg(r.u16(21));
+            if (!a.class_b) {
+                if (const auto st = r.u8(25)) a.nav_status = static_cast<std::uint8_t>(*st & 0x0F);
+            }
             bus_.publish(a);
             return true;
         }

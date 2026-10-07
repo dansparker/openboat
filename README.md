@@ -37,9 +37,12 @@ Simulator mit Demo-Route (`--demo`), Grundkarte aus OpenStreetMap (`tools/make_b
 | GPS / Kompass / Log / Echolot / Wind | NMEA 0183 (UDP, TCP, seriell, Logdatei) und NMEA 2000 (SocketCAN, candump) | ✅ v0.1 (ungetestet an Hardware) |
 | Datenleiste | SOG, COG, Steuerkurs, Fahrt durchs Wasser, Tiefe, scheinbarer/wahrer Wind, Wassertemperatur | ✅ v0.1 |
 | AIS | Ziele aus AIVDM (Typ 1/2/3/5/18/19/24) und NMEA 2000 (129038/129039), CPA/TCPA, Kollisionswarnung | ✅ v0.1 |
+| AIS-Zielliste | Notsender zuerst, dann Kollisionsgefahr, dann Distanz; Details (Rufzeichen, Typ, Maße, Status), „Auf Karte“, Ziel auf der Karte antippen | ✅ v0.2 |
+| AIS-SART / MOB / EPIRB | Erkennung an der MMSI (970/972/974), eigenes Kartensymbol, Alarm unabhängig vom CPA; Testaussendungen (Status 15) ohne Alarm | ✅ v0.2 |
+| Missweisung | Vom Gerät (RMC, HDG, PGN 127250/127258), sonst aus dem World Magnetic Model (WMM2025, mitgeliefert, gültig bis Ende 2029) | ✅ v0.2 |
 | Alarme | Ankerwache, Flachwasser, AIS-Kollision, GNSS-Ausfall, Tiefenausfall; Quittierung; **Ton über Lautsprecher und GPIO-Summer** (Alarm: Dauerpiepen, Warnung: Doppelpiep), Summer-Selbsttest beim Start | ✅ v0.2 |
 | Nachtmodus | Rote, abgedunkelte Darstellung | ✅ v0.1 |
-| Simulator | Boot auf dem Attersee mit AIS-Ziel | ✅ v0.1 |
+| Simulator | Boot auf dem Attersee mit magnetischem Kompass, AIS-Zielen und MOB-Sender im Testmodus | ✅ v0.1 |
 | Tiefenlinien | `tools/make_depth.py`: Tiefenlinien, Tiefenzahlen, Flachwasser-Schattierung aus EMODnet/GEBCO-Rastern oder S-57-Tiefenlinien (über GDAL); Sicherheitstiefe in der App einstellbar (dicke Sicherheitslinie, wirkt sofort) | ✅ v0.2 |
 | Kurs oben / Nord oben | Kartendrehung mit Hysterese, Nordpfeil zum Umschalten; Ortsnamen und Tiefenzahlen bleiben aufrecht (abschaltbar) | ✅ v0.2 |
 | Vektorkarten (S-57 / Inland ENC) | vollständige Darstellung nach S-52 | 🔜 [Roadmap](docs/roadmap.md) |
@@ -63,7 +66,7 @@ src/
 ├── modules/
 │   ├── nmea0183/    Satz-Parser, AIS-Decoder, Datenquelle
 │   ├── nmea2000/    PGN-Decoder, Fast-Packet, Datenquelle (nur Empfang)
-│   ├── nav/         Wahrer Wind, AIS-Zieltabelle (CPA/TCPA), Alarme
+│   ├── nav/         Wahrer Wind, AIS-Zieltabelle (CPA/TCPA), Alarme, Missweisung (WMM)
 │   └── sim/         Simulator
 └── app/             Qt/QML-Anwendung: Karte, Datenleiste, Alarme
 tests/               GoogleTest-Unit-Tests

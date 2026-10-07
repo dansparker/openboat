@@ -104,6 +104,7 @@ std::optional<core::AisReport> AisDecoder::decode_payload(std::string_view paylo
         case 2:
         case 3:
             if (b.size() < 137) return std::nullopt;
+            r.nav_status = static_cast<std::uint8_t>(b.u(38, 4));
             position(r, b, 61, 89);
             motion(r, b, 50, 116, 128);
             return r;
