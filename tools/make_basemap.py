@@ -25,6 +25,8 @@ import io
 import json
 import math
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -35,7 +37,8 @@ try:
 except ImportError:
     sys.exit("Pillow is required: pip install pillow")
 
-OVERPASS = "https://overpass-api.de/api/interpreter"
+# Public Overpass instances; overloaded servers answer 429/504, then the next one is tried
+OVERPASS = ("https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter")
 MAX_AREA_DEG2 = 0.25  # Overpass fair use; larger areas: --osm-json from your own extract
 
 # Paper-chart inspired colours
@@ -68,11 +71,25 @@ def overpass_query(bbox):
 out geom;"""
 
 
-def fetch_overpass(bbox):
+def fetch_overpass(bbox, attempts=4):
     data = urllib.parse.urlencode({"data": overpass_query(bbox)}).encode()
-    req = urllib.request.Request(OVERPASS, data=data, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        return json.load(r)
+    last = None
+    for attempt in range(attempts):
+        url = OVERPASS[attempt % len(OVERPASS)]
+        try:
+            req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=300) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 502, 503, 504):
+                raise
+            last = e
+        except (urllib.error.URLError, TimeoutError) as e:
+            last = e
+        wait = 15 * (attempt + 1)
+        print(f"{url}: {last} - retrying in {wait} s")
+        time.sleep(wait)
+    sys.exit(f"Overpass not reachable ({last}); try again later or use --osm-json")
 
 
 def join_rings(ways):
