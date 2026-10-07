@@ -84,14 +84,15 @@ Item {
         model: chart.layers
         delegate: Item {
             id: layer
-            required property var modelData
-            readonly property string layerId: modelData ? modelData.id : ""
+            required property int index
+            readonly property var info: chart.layers[index] || ({})
+            readonly property string layerId: info.provider || ""
             anchors.fill: parent
             opacity: Theme.chartDimming
             // Overzoom: beyond maxZoom the layer is simply not drawn (no blurry upscaling in v0.1)
-            visible: chart.zoom >= modelData.minZoom && chart.zoom <= modelData.maxZoom
+            visible: layerId !== "" && chart.zoom >= info.minZoom && chart.zoom <= info.maxZoom
             Repeater {
-                model: layer.visible && layer.layerId !== "" ? chart.tiles : []
+                model: layer.visible ? chart.tiles : []
                 delegate: Image {
                     required property var modelData
                     x: modelData.x * 256 - chart.centerX + chart.width / 2

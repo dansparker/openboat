@@ -23,7 +23,7 @@ Die Screenshots erzeugt die CI bei jedem Lauf (Artefakt „screenshots“).
 
 | GPSMAP 9000xsv | OpenBoat | Stand |
 |---|---|---|
-| Kartenplotter (BlueChart g3 / Navionics) | Rasterkarten aus MBTiles: OpenSeaMap-Seezeichen über einer Basiskarte, Eigenschiff, COG-Vektor, Kursstrich | ✅ v0.1 |
+| Kartenplotter (BlueChart g3 / Navionics) | Rasterkarten aus MBTiles: **selbst gerenderte Grundkarte aus OpenStreetMap** (`tools/make_basemap.py`) + OpenSeaMap-Seezeichen, Eigenschiff, COG-Vektor, Kursstrich | ✅ v0.2 |
 | GPS / Kompass / Log / Echolot / Wind | NMEA 0183 (UDP, TCP, seriell, Logdatei) und NMEA 2000 (SocketCAN, candump) | ✅ v0.1 (ungetestet an Hardware) |
 | Datenleiste | SOG, COG, Steuerkurs, Fahrt durchs Wasser, Tiefe, scheinbarer/wahrer Wind, Wassertemperatur | ✅ v0.1 |
 | AIS | Ziele aus AIVDM (Typ 1/2/3/5/18/19/24) und NMEA 2000 (129038/129039), CPA/TCPA, Kollisionswarnung | ✅ v0.1 |
@@ -31,8 +31,9 @@ Die Screenshots erzeugt die CI bei jedem Lauf (Artefakt „screenshots“).
 | Nachtmodus | Rote, abgedunkelte Darstellung | ✅ v0.1 |
 | Simulator | Boot auf dem Attersee mit AIS-Ziel | ✅ v0.1 |
 | Vektorkarten (S-57 / Inland ENC) | Darstellung nach S-52-Grundzügen | 🔜 [Roadmap](docs/roadmap.md) |
-| Wegpunkte, Routen, Track, Go-To | | 🔜 |
-| Autopilot-Anbindung | | 🔜 |
+| Wegpunkte, Routen, Go-To, MOB | Wegpunkt per Langdruck auf die Karte, Routen-Editor, automatischer Wegpunktwechsel, XTE/BTW/DTW/TTG, Ankunftsalarm, MOB-Taste; Speicherung als GPX | ✅ v0.2 |
+| Track | | 🔜 |
+| Autopilot-Anbindung | NMEA 0183 RMB/APB/XTE über UDP oder seriell (`autopilot_output`) | ✅ v0.2 (ungetestet am Autopiloten) |
 | Echolot-Bild (CHIRP, ClearVü/SideVü) | Nur über offene Sonar-Hardware möglich, siehe [ADR 0004](docs/adr/0004-sonar-radar.md) | 🔬 Recherche |
 | Radar | Nur Geräte mit offengelegtem/reverse-engineertem Protokoll | 🔬 Recherche |
 
@@ -53,7 +54,7 @@ src/
 │   └── sim/         Simulator
 └── app/             Qt/QML-Anwendung: Karte, Datenleiste, Alarme
 tests/               GoogleTest-Unit-Tests
-tools/               fetch_tiles.py (Offline-Karten als MBTiles)
+tools/               make_basemap.py (Grundkarte aus OSM), fetch_tiles.py (Overlays herunterladen)
 config/              Beispielkonfiguration
 docs/                Architektur, Karten, Hardware, Roadmap, ADRs
 ```

@@ -21,6 +21,26 @@ Für Küstengewässer außerhalb der USA (z. B. Mittelmeer) gibt es **keine frei
 Seekarten**; OpenSeaMap + OSM + EMODnet sind dort die freie Kombination – mit entsprechend
 geringerer Verlässlichkeit, vor allem bei Tiefenangaben.
 
+## Grundkarte selbst rendern
+
+OpenSeaMap liefert **nur die Seezeichen**; die Karte darunter ist OpenStreetMap, und deren
+Kachelserver verbieten Massen-Downloads. Die OSM-**Daten** sind aber frei (ODbL). Deshalb
+rendert `tools/make_basemap.py` eine Grundkarte im Seekartenstil selbst: Land, Wasser,
+Uferlinie, Flüsse, Häfen/Marinas, Stege/Molen, Brücken und Ortsnamen (ohne Überlappungen).
+
+```bash
+pip install pillow
+python tools/make_basemap.py --bbox 13.47,47.78,13.62,47.96 --zooms 10-16 --out charts/base.mbtiles
+```
+
+- Kleine Gebiete (bis 0,25 Grad²) holt das Werkzeug über die Overpass-API. Für größere Gebiete
+  einen eigenen Auszug verwenden (`--osm-json`), z. B. von Geofabrik + osmium/Overpass lokal.
+- **Küsten/Meer:** OSM hat keine fertigen Meeresflächen. Dafür die freien „land polygons“ von
+  osmdata.openstreetmap.de (`land-polygons-split-4326`) laden und `--land-polygons …/land_polygons.shp`
+  angeben (braucht `pip install pyshp`). Ohne diese Datei warnt das Werkzeug, weil das Meer sonst
+  als Land gezeichnet würde.
+- Die Grundkarte enthält **keine Tiefen**. Tiefenlinien kommen später aus Inland ENC/EMODnet.
+
 ## Seezeichen-Overlay herunterladen (Beispiel Attersee)
 
 ```bash

@@ -13,9 +13,9 @@ Rectangle {
     border.color: g.mode === "mob" ? Theme.danger : Theme.route
     border.width: 2
 
-    function nm(v) { return v < 0 ? "---" : v < 1 ? (v * 1852).toFixed(0) + " m" : v.toFixed(2) + " sm"; }
+    function nm(v) { return v === undefined || v < 0 ? "---" : v < 1 ? (v * 1852).toFixed(0) + " m" : v.toFixed(2) + " sm"; }
     function ttg(min) {
-        if (min < 0) return "---";
+        if (min === undefined || min < 0) return "---";
         if (min < 60) return min.toFixed(0) + " min";
         return Math.floor(min / 60) + " h " + Math.round(min % 60).toString().padStart(2, "0");
     }
@@ -35,7 +35,7 @@ Rectangle {
         }
         Column {
             Text { text: "BTW"; color: Theme.label; font.pixelSize: 13 }
-            Text { text: strip.g.btw < 0 ? "---" : Math.round(strip.g.btw).toString().padStart(3, "0") + "°"; color: Theme.text; font.pixelSize: 20; font.bold: true; font.family: Theme.mono }
+            Text { text: strip.g.btw === undefined || strip.g.btw < 0 ? "---" : Math.round(strip.g.btw).toString().padStart(3, "0") + "°"; color: Theme.text; font.pixelSize: 20; font.bold: true; font.family: Theme.mono }
         }
         Column {
             visible: strip.g.hasXte === true

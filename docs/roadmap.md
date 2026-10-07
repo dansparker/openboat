@@ -11,9 +11,11 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 - Raspberry-Pi-Image mit schreibgeschütztem Root-Dateisystem (wie OpenEFIS `image/`)
 
 ## v0.3 – Navigation
-- Wegpunkte, Routen, Go-To mit XTE, BTW/DTW, ETA; MOB-Taste
+- ~~Wegpunkte, Routen, Go-To mit XTE, BTW/DTW, ETA; MOB-Taste~~ ✅
+- Routen bearbeiten (Punkte verschieben/einfügen), GPX-Import/-Export über USB-Stick
 - AIS-Zielliste und Detailansicht, AIS-SART/MOB-Erkennung (MMSI 970/972/974)
-- Ausgabe von RMB/APB (NMEA 0183) für Autopiloten
+- ~~Ausgabe von RMB/APB (NMEA 0183) für Autopiloten~~ ✅ (Test an echten Autopiloten offen)
+- Routenprüfung gegen Untiefen (braucht Tiefendaten, v0.4)
 
 ## v0.4 – Vektorkarten
 - S-57 / Inland ENC lesen (GDAL) und in eigenes Kachel- oder Geometrieformat konvertieren
