@@ -33,6 +33,9 @@ Rectangle {
             model: banner.alarms
             Text {
                 required property var modelData
+                width: banner.width - 20
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
                 text: modelData.text
                 color: modelData.acknowledged ? "#d0a0a0" : "white"
                 font.pixelSize: 24

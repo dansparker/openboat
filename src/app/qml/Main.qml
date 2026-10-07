@@ -136,6 +136,19 @@ Window {
                 onNewRoute: { visible = false; chartView.editPoints = []; chartView.editing = true; }
             }
 
+            // Over the chart only (never over the MOB key and the side panel), at the
+            // top: the chart centre is where the own boat is drawn when following.
+            AlarmBanner {
+                id: alarmBanner
+                z: 10
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.topMargin: 10
+                width: Math.min(parent.width - 20, 760)
+                alarms: boat.alarms
+                onAcknowledge: boat.acknowledgeAlarms()
+            }
+
             SettingsPage {
                 id: settingsPage
                 visible: false
@@ -222,13 +235,4 @@ Window {
         }
     }
 
-    AlarmBanner {
-        id: alarmBanner
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.topMargin: 16
-        width: Math.min(parent.width - 40, 760)
-        alarms: boat.alarms
-        onAcknowledge: boat.acknowledgeAlarms()
-    }
 }
