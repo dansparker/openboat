@@ -187,34 +187,34 @@ Window {
 
             GridLayout {
                 columns: 2
-                Layout.fillWidth: true
+                Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                 columnSpacing: 6
                 rowSpacing: 6
-                TouchButton { Layout.fillWidth: true; text: "+"; onClicked: chartView.setZoom(chartView.zoom + 1) }
-                TouchButton { Layout.fillWidth: true; text: "−"; onClicked: chartView.setZoom(chartView.zoom - 1) }
+                TouchButton { Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */; text: "+"; onClicked: chartView.setZoom(chartView.zoom + 1) }
+                TouchButton { Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */; text: "−"; onClicked: chartView.setZoom(chartView.zoom - 1) }
                 TouchButton {
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     text: "Folgen"
                     fontSize: 16
                     checked: chartView.follow
                     onClicked: { chartView.follow = true; chartView.recentre(); }
                 }
                 TouchButton {
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     text: "Nacht"
                     fontSize: 16
                     checked: Theme.night
                     onClicked: Theme.night = !Theme.night
                 }
                 TouchButton {
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
                     text: "Routen/Tracks"
                     checked: navPage.visible
                     onClicked: { settingsPage.visible = false; navPage.visible = !navPage.visible; }
                 }
                 TouchButton {
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
                     text: "Setup"
                     checked: settingsPage.visible
@@ -222,7 +222,7 @@ Window {
                 }
                 TouchButton {
                     Layout.columnSpan: 2
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
                     checked: boat.anchorActive
                     text: boat.anchorActive ? "Anker auf (halten) " + boat.anchorDistance.toFixed(0) + "/" + boat.anchorRadius.toFixed(0) + " m"
