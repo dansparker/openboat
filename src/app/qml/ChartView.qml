@@ -71,12 +71,13 @@ Item {
         delegate: Item {
             id: layer
             required property var modelData
+            readonly property string layerId: modelData ? modelData.id : ""
             anchors.fill: parent
             opacity: Theme.chartDimming
             // Overzoom: beyond maxZoom the layer is simply not drawn (no blurry upscaling in v0.1)
             visible: chart.zoom >= modelData.minZoom && chart.zoom <= modelData.maxZoom
             Repeater {
-                model: layer.visible ? chart.tiles : []
+                model: layer.visible && layer.layerId !== "" ? chart.tiles : []
                 delegate: Image {
                     required property var modelData
                     x: modelData.x * 256 - chart.centerX + chart.width / 2
@@ -85,7 +86,7 @@ Item {
                     height: 256
                     asynchronous: false  // SQLite connection belongs to the GUI thread
                     cache: true
-                    source: "image://" + layer.modelData.id + "/" + chart.zoom + "/" + modelData.wx + "/" + modelData.y
+                    source: "image://" + layer.layerId + "/" + chart.zoom + "/" + modelData.wx + "/" + modelData.y
                 }
             }
         }

@@ -24,7 +24,10 @@ Window {
         }
 
         ColumnLayout {
-            Layout.preferredWidth: 230
+            // Fixed width: the chart gets all remaining space
+            Layout.preferredWidth: 260
+            Layout.maximumWidth: 260
+            Layout.fillWidth: false
             Layout.fillHeight: true
             spacing: 6
 

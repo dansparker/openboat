@@ -141,6 +141,9 @@ int main(int argc, char* argv[]) {
     }
     for (auto& m : modules) m->start(bus);
 
+    // Declared before the engine so it outlives the QML that binds to it
+    BoatModel model(bus);
+
     // Charts: first entry is the base map, the rest are overlays (e.g. seamarks)
     QQmlApplicationEngine engine;
     QVariantList layers;
@@ -158,7 +161,6 @@ int main(int argc, char* argv[]) {
                                   {"maxZoom", info.max_zoom}});
     }
 
-    BoatModel model(bus);
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
