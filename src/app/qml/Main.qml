@@ -208,7 +208,7 @@ Window {
                 }
                 TouchButton {
                     Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
-                    fontSize: 16
+                    fontSize: 14
                     text: "Routen/Tracks"
                     checked: navPage.visible
                     onClicked: { settingsPage.visible = false; navPage.visible = !navPage.visible; }
