@@ -11,6 +11,7 @@ Window {
     color: Theme.background
     Component.onCompleted: {
         Theme.night = startNight;
+        chartView.setZoom(startZoom);
         navPage.visible = startPage === "routes";
         settingsPage.visible = startPage === "settings";
     }

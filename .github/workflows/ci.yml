@@ -70,8 +70,9 @@ jobs:
       - name: Smoke test + screenshots (simulator, no QML errors)
         run: |
           app=./build/release/src/app/openboat
-          for mode in day night settings; do
+          for mode in day night settings track; do
             flag=""; [ "$mode" = night ] && flag="--night"; [ "$mode" = settings ] && flag="--page settings"
+            [ "$mode" = track ] && flag="--zoom 18"
             set +e
             QT_DEBUG_PLUGINS=0 QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json --demo $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
             rc=$?
@@ -81,6 +82,12 @@ jobs:
             test $rc -eq 0
             ! grep -E "TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign" app-$mode.log
           done
+      - name: Track was recorded
+        run: |
+          ls -l config/tracks
+          n=$(cat config/tracks/*.csv | grep -cv '^#')
+          echo "$n track points"
+          test "$n" -ge 2
       - uses: actions/upload-artifact@v4
         if: always()
         with:

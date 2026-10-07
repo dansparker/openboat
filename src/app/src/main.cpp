@@ -30,6 +30,7 @@
 #include <QVariantList>
 #include <QtQml/QQmlExtensionPlugin>
 
+#include <algorithm>
 #include <exception>
 #include <memory>
 #include <vector>
@@ -119,7 +120,9 @@ int main(int argc, char* argv[]) {
                                 QStringLiteral("Start a demo route near the simulator (screenshots, trying out)"));
     QCommandLineOption page_opt(QStringLiteral("page"), QStringLiteral("Open a page at start: routes | settings"),
                                 QStringLiteral("page"));
-    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt, demo_opt, page_opt});
+    QCommandLineOption zoom_opt(QStringLiteral("zoom"), QStringLiteral("Initial chart zoom level (3..18)"),
+                                QStringLiteral("level"), QStringLiteral("14"));
+    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt, demo_opt, page_opt, zoom_opt});
     cli.process(app);
 
     const QString config_path = cli.value(config_opt);
@@ -207,6 +210,7 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
     engine.rootContext()->setContextProperty(QStringLiteral("startNight"), cli.isSet(night_opt));
     engine.rootContext()->setContextProperty(QStringLiteral("startPage"), cli.value(page_opt));
+    engine.rootContext()->setContextProperty(QStringLiteral("startZoom"), std::clamp(cli.value(zoom_opt).toInt(), 3, 18));
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
         Qt::QueuedConnection);
