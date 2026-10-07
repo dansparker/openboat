@@ -70,6 +70,7 @@ enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, Gnss
 struct Alarm {
     AlarmId id;
     std::string text;
+    std::uint32_t subject = 0;  // AIS: MMSI, so each new target alarms on its own
 };
 
 struct AlarmList {
@@ -134,7 +135,7 @@ private:
     NavSettings settings_;
     std::atomic<bool> running_{false};
     std::thread worker_;
-    std::vector<std::pair<int, core::SubscriptionId>> subscriptions_;
+    std::optional<core::SubscriptionId> wind_subscription_;
     core::DataBus* bus_ = nullptr;
 };
 

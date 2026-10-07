@@ -130,7 +130,7 @@ AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Positi
         std::ostringstream s;
         s << "AIS-Kollisionsgefahr: " << (t.data.name ? *t.data.name : std::to_string(t.data.mmsi));
         if (t.tcpa_s) s << " in " << static_cast<int>(*t.tcpa_s / 60.0) << " min";
-        out.active.push_back({AlarmId::AisCollision, s.str()});
+        out.active.push_back({AlarmId::AisCollision, s.str(), t.data.mmsi});
     }
     return out;
 }
@@ -144,7 +144,7 @@ void NavModule::start(core::DataBus& bus) {
     bus_ = &bus;
 
     // True wind immediately on every apparent wind sample (no extra latency)
-    subscriptions_.emplace_back(0, bus.topic<core::ApparentWind>().subscribe([&bus](const auto& s) {
+    wind_subscription_ = bus.topic<core::ApparentWind>().subscribe([&bus](const auto& s) {
         double heading = 0.0;
         if (const auto h = bus.latest<core::Heading>(); h && core::is_fresh(*h, std::chrono::seconds(3))) {
             heading = h->value.heading_deg;
@@ -158,7 +158,7 @@ void NavModule::start(core::DataBus& bus) {
             speed = c->value.sog_mps;
         }
         bus.publish(core::true_wind(s.value, heading, speed));
-    }));
+    });
 
     worker_ = std::thread([this, &bus] {
         std::mutex mutex;
@@ -200,11 +200,9 @@ void NavModule::start(core::DataBus& bus) {
 void NavModule::stop() {
     running_ = false;
     if (worker_.joinable()) worker_.join();
-    if (bus_ != nullptr) {
-        for (const auto& [kind, id] : subscriptions_) {
-            if (kind == 0) bus_->topic<core::ApparentWind>().unsubscribe(id);
-        }
-        subscriptions_.clear();
+    if (bus_ != nullptr && wind_subscription_) {
+        bus_->topic<core::ApparentWind>().unsubscribe(*wind_subscription_);
+        wind_subscription_.reset();
     }
 }
 

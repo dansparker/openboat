@@ -78,10 +78,12 @@ void BoatModel::poll() {
     if (const auto list = fresh<boat::nav::AlarmList>(bus_, 5s)) {
         for (const auto& a : list->active) {
             alarms_.append(QVariantMap{{QStringLiteral("id"), static_cast<int>(a.id)},
+                                       {QStringLiteral("key"), QStringLiteral("%1:%2").arg(static_cast<int>(a.id)).arg(a.subject)},
                                        {QStringLiteral("text"), QString::fromStdString(a.text)}});
         }
     } else {
         alarms_.append(QVariantMap{{QStringLiteral("id"), 99},
+                                   {QStringLiteral("key"), QStringLiteral("99:0")},
                                    {QStringLiteral("text"), QStringLiteral("Alarmüberwachung ausgefallen")}});
     }
     if (const auto anchor = bus_.latest<boat::nav::AnchorState>()) {

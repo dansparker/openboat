@@ -26,17 +26,17 @@ TEST(DataBus, LatestReturnsLastPublishedValue) {
 TEST(DataBus, TopicsAreIsolatedByType) {
     DataBus bus;
     bus.publish(Depth{.below_transducer_m = 5.0});
-    EXPECT_FALSE(bus.latest<AirData>().has_value());
+    EXPECT_FALSE(bus.latest<WaterTemperature>().has_value());
 }
 
 TEST(DataBus, SubscribersReceiveSamples) {
     DataBus bus;
     std::vector<double> received;
-    bus.topic<AirData>().subscribe(
-        [&](const Sample<AirData>& s) { received.push_back(s.value.indicated_airspeed_kt); });
+    bus.topic<WaterTemperature>().subscribe(
+        [&](const Sample<WaterTemperature>& s) { received.push_back(s.value.celsius); });
 
-    bus.publish(AirData{.indicated_airspeed_kt = 90.0});
-    bus.publish(AirData{.indicated_airspeed_kt = 95.0});
+    bus.publish(WaterTemperature{.celsius = 90.0});
+    bus.publish(WaterTemperature{.celsius = 95.0});
 
     ASSERT_EQ(received.size(), 2u);
     EXPECT_DOUBLE_EQ(received[1], 95.0);

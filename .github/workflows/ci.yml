@@ -39,18 +39,19 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Install Qt and Ninja
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build qt6-base-dev qt6-declarative-dev libqt6sql6-sqlite \
-            qml6-module-qtquick qml6-module-qtquick-layouts qml6-module-qtquick-window libgl-dev
+      - name: Install Ninja and system libraries
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgl-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 xvfb
+      # Ubuntu 24.04 ships Qt 6.4; the app needs >= 6.5
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
       - name: Configure
         run: cmake --preset release -DBOAT_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build --preset release
       - name: Smoke test (starts with the simulator, no QML errors)
         run: |
-          sudo apt-get install -y xvfb
           set +e
           timeout 10 xvfb-run -a ./build/release/src/app/openboat --config config/boat.example.json > app.log 2>&1
           rc=$?

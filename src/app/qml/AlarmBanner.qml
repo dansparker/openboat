@@ -4,9 +4,9 @@ import QtQuick
 // alarms stay visible (dimmed) as long as the condition persists.
 Rectangle {
     id: banner
-    property var alarms: []        // [{ id, text }]
-    property var acknowledged: []  // alarm ids
-    readonly property var unacknowledged: alarms.filter(a => acknowledged.indexOf(a.id) < 0)
+    property var alarms: []        // [{ id, key, text }]
+    property var acknowledged: []  // alarm keys
+    readonly property var unacknowledged: alarms.filter(a => acknowledged.indexOf(a.key) < 0)
 
     visible: alarms.length > 0
     height: column.implicitHeight + 16
@@ -16,7 +16,7 @@ Rectangle {
     border.width: 2
 
     // Forget acknowledgements of alarms that went away, so they alarm again
-    onAlarmsChanged: acknowledged = acknowledged.filter(id => alarms.some(a => a.id === id))
+    onAlarmsChanged: acknowledged = acknowledged.filter(k => alarms.some(a => a.key === k))
 
     Timer {
         id: blink
@@ -45,6 +45,6 @@ Rectangle {
 
     MouseArea {
         anchors.fill: parent
-        onClicked: banner.acknowledged = banner.alarms.map(a => a.id)
+        onClicked: banner.acknowledged = banner.alarms.map(a => a.key)
     }
 }

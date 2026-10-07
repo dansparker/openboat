@@ -32,8 +32,9 @@ class BoatModel : public QObject {
     Q_PROPERTY(double twsKn READ twsKn NOTIFY changed)
     Q_PROPERTY(bool waterTempValid READ waterTempValid NOTIFY changed)
     Q_PROPERTY(double waterTemp READ waterTemp NOTIFY changed)
-    // Each alarm: { id: int (AlarmId; 99 = alarm monitoring itself failed), text }.
-    // Acknowledgement works on the id: texts like "45 m from anchor" change every second.
+    // Each alarm: { id: int (AlarmId; 99 = alarm monitoring itself failed), key, text }.
+    // Acknowledgement works on the key (id + AIS MMSI): texts like "45 m from anchor"
+    // change every second, and a second dangerous AIS target must alarm again.
     Q_PROPERTY(QVariantList alarms READ alarms NOTIFY changed)
     Q_PROPERTY(bool anchorActive READ anchorActive NOTIFY changed)
     Q_PROPERTY(double anchorLat READ anchorLat NOTIFY changed)

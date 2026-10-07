@@ -1,5 +1,7 @@
 #include "boat/nmea2000/decoder.hpp"
 
+#include "boat/core/marine_data.hpp"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
