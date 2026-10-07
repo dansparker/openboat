@@ -32,7 +32,8 @@ Simulator mit Demo-Route (`--demo`), Grundkarte aus OpenStreetMap (`tools/make_b
 | Simulator | Boot auf dem Attersee mit AIS-Ziel | ✅ v0.1 |
 | Vektorkarten (S-57 / Inland ENC) | Darstellung nach S-52-Grundzügen | 🔜 [Roadmap](docs/roadmap.md) |
 | Wegpunkte, Routen, Go-To, MOB | Wegpunkt per Langdruck auf die Karte, Routen-Editor, automatischer Wegpunktwechsel, XTE/BTW/DTW/TTG, Ankunftsalarm, MOB-Taste; Speicherung als GPX | ✅ v0.2 |
-| Track | | 🔜 |
+| Track | Aufzeichnung mit Sprungfilter (vor Anker keine Punktwolke), Tagesdateien nur durch Anhängen (stromausfallsicher), Zeit aus dem GNSS, GPX-Export, Anzeige auf der Karte | ✅ v0.2 |
+| Einstellungen | Einheiten (kn/km/h, m/ft, sm/km), Alarmgrenzen, Anker-/Ankunftsradius, Kursvektor, Track; wirken sofort, atomar gespeichert | ✅ v0.2 |
 | Autopilot-Anbindung | NMEA 0183 RMB/APB/XTE über UDP oder seriell (`autopilot_output`) | ✅ v0.2 (ungetestet am Autopiloten) |
 | Echolot-Bild (CHIRP, ClearVü/SideVü) | Nur über offene Sonar-Hardware möglich, siehe [ADR 0004](docs/adr/0004-sonar-radar.md) | 🔬 Recherche |
 | Radar | Nur Geräte mit offengelegtem/reverse-engineertem Protokoll | 🔬 Recherche |

@@ -19,3 +19,5 @@ charts/*
 *.000
 logs/
 config/navigation.gpx
+config/settings.json
+config/tracks/

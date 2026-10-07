@@ -4,10 +4,10 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 
 ## v0.2 – sicher benutzbar
 - ~~Akustischer Alarm~~ ✅ (Lautsprecher über Qt Multimedia, GPIO-Summer über `buzzer` in der Konfiguration)
-- Einstellungsseite: Alarmgrenzen, Ankerradius, Tiefenoffset, Einheiten (kn/km/h, m/ft)
+- ~~Einstellungsseite~~ ✅ (Tiefenoffset noch in boat.json, wirkt nach Neustart)
 - Missweisung aus Weltmagnetfeldmodell (WMM, aus OpenEFIS übernehmbar), wenn kein Gerät sie liefert
 - Overzoom (Kacheln der höchsten Stufe vergrößern) und Kursoben-Darstellung (course-up)
-- Logbuch/Track-Aufzeichnung (GPX), NMEA-Mitschnitt für Replay
+- ~~Track-Aufzeichnung (GPX)~~ ✅; offen: Logbuch-Ansicht, Tracks früherer Tage anzeigen, NMEA-Mitschnitt für Replay
 - Raspberry-Pi-Image mit schreibgeschütztem Root-Dateisystem (wie OpenEFIS `image/`)
 
 ## v0.3 – Navigation
