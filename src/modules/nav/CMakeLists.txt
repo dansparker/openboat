@@ -1,0 +1,5 @@
+add_library(boat_nav src/nav.cpp)
+add_library(boat::nav ALIAS boat_nav)
+target_include_directories(boat_nav PUBLIC include)
+target_link_libraries(boat_nav PUBLIC boat::core)
+boat_set_warnings(boat_nav)

@@ -1,0 +1,23 @@
+{
+  "sources": [
+    { "type": "sim" }
+  ],
+  "_sources_examples": [
+    { "type": "nmea0183", "kind": "udp", "port": 10110 },
+    { "type": "nmea0183", "kind": "tcp", "host": "192.168.4.1", "port": 10110 },
+    { "type": "nmea0183", "kind": "serial", "device": "/dev/ttyUSB0", "baud": 38400 },
+    { "type": "nmea0183", "kind": "file", "path": "logs/trip.nmea", "lines_per_second": 20 },
+    { "type": "nmea2000", "interface": "can0" },
+    { "type": "nmea2000", "candump": "logs/n2k.log" }
+  ],
+  "charts": [
+    "../charts/base.mbtiles",
+    "../charts/seamarks.mbtiles"
+  ],
+  "depth_offset_m": -0.4,
+  "alarms": {
+    "shallow_m": 2.0,
+    "cpa_nm": 0.5,
+    "tcpa_min": 10
+  }
+}

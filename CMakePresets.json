@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug (with Qt app)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release (with Qt app)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "core-only",
+      "inherits": "base",
+      "displayName": "Core libraries + tests (no Qt)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BOAT_BUILD_APP": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug",     "configurePreset": "debug" },
+    { "name": "release",   "configurePreset": "release" },
+    { "name": "core-only", "configurePreset": "core-only" }
+  ],
+  "testPresets": [
+    { "name": "debug",     "configurePreset": "debug",     "output": { "outputOnFailure": true } },
+    { "name": "core-only", "configurePreset": "core-only", "output": { "outputOnFailure": true } }
+  ]
+}

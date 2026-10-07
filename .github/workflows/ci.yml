@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core + tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+        if: runner.os == 'Windows'
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Configure
+        run: cmake --preset core-only
+      - name: Build
+        run: cmake --build --preset core-only
+      - name: Test
+        run: ctest --preset core-only
+
+  app:
+    name: Qt application (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Qt and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build qt6-base-dev qt6-declarative-dev libqt6sql6-sqlite \
+            qml6-module-qtquick qml6-module-qtquick-layouts qml6-module-qtquick-window libgl-dev
+      - name: Configure
+        run: cmake --preset release -DBOAT_BUILD_TESTS=OFF
+      - name: Build
+        run: cmake --build --preset release
+      - name: Smoke test (starts with the simulator, no QML errors)
+        run: |
+          sudo apt-get install -y xvfb
+          set +e
+          timeout 10 xvfb-run -a ./build/release/src/app/openboat --config config/boat.example.json > app.log 2>&1
+          rc=$?
+          set -e
+          cat app.log
+          test $rc -eq 124  # still running after 10 s = did not crash
+          ! grep -E "TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign" app.log

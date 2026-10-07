@@ -1,0 +1,5 @@
+add_library(boat_sim src/simulator.cpp)
+add_library(boat::sim ALIAS boat_sim)
+target_include_directories(boat_sim PUBLIC include)
+target_link_libraries(boat_sim PUBLIC boat::core)
+boat_set_warnings(boat_sim)

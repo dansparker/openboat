@@ -1,0 +1,20 @@
+build/
+out/
+.cache/
+compile_commands.json
+CMakeUserPresets.json
+*.user
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+__pycache__/
+
+# Downloaded / generated charts (see docs/charts.md)
+charts/*
+!charts/README.md
+*.mbtiles
+*.000
+logs/
