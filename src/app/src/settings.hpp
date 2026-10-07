@@ -37,6 +37,12 @@ class Settings : public QObject {
     Q_PROPERTY(bool trackRecording READ trackRecording WRITE setTrackRecording NOTIFY changed)
     Q_PROPERTY(double trackSpacing READ trackSpacing WRITE setTrackSpacing NOTIFY changed)
     Q_PROPERTY(bool showTrack READ showTrack WRITE setShowTrack NOTIFY changed)
+    Q_PROPERTY(bool overzoom READ overzoom WRITE setOverzoom NOTIFY changed)
+
+    // Depth offset: "transducer" (use what the transducer sends) or "manual" (depthOffset
+    // replaces it). Metres; < 0: depth below keel, > 0: depth below waterline.
+    Q_PROPERTY(QString depthOffsetMode READ depthOffsetMode WRITE setDepthOffsetMode NOTIFY changed)
+    Q_PROPERTY(double depthOffset READ depthOffset WRITE setDepthOffset NOTIFY changed)
 
     Q_PROPERTY(QString lastError READ lastError NOTIFY changed)
 
@@ -61,6 +67,9 @@ public:
     bool trackRecording() const { return track_recording_; }
     double trackSpacing() const { return track_spacing_; }
     bool showTrack() const { return show_track_; }
+    bool overzoom() const { return overzoom_; }
+    QString depthOffsetMode() const { return depth_offset_mode_; }
+    double depthOffset() const { return depth_offset_; }
     QString lastError() const { return error_; }
 
     void setSpeedUnit(const QString& v);
@@ -75,6 +84,12 @@ public:
     void setTrackRecording(bool v);
     void setTrackSpacing(double v);
     void setShowTrack(bool v);
+    void setOverzoom(bool v);
+    void setDepthOffsetMode(const QString& v);
+    void setDepthOffset(double v);
+
+    // Publishes the depth offset (call once after the modules started)
+    void publishDepthOffset();
 
     // Values for the core modules at start-up
     [[nodiscard]] boat::nav::NavSettings navSettings() const;
@@ -103,5 +118,8 @@ private:
     bool track_recording_ = true;
     double track_spacing_ = 10.0;
     bool show_track_ = true;
+    bool overzoom_ = true;
+    QString depth_offset_mode_ = QStringLiteral("transducer");
+    double depth_offset_ = 0.0;
     QString error_;
 };

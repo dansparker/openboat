@@ -151,7 +151,45 @@ Rectangle {
                     onChangedTo: v => settings.anchorRadius = v
                 }
 
+                Heading { text: "Tiefe" }
+                ChoiceRow {
+                    label: "Tiefenoffset"
+                    options: [{ value: "transducer", text: "vom Geber" }, { value: "manual", text: "manuell" }]
+                    current: settings.depthOffsetMode
+                    onChosen: v => settings.depthOffsetMode = v
+                }
+                StepRow {
+                    visible: settings.depthOffsetMode === "manual"
+                    label: "Offset (− unter Kiel, + unter Wasserlinie)"
+                    value: settings.depthOffset * settings.depthFactor
+                    stepSize: settings.depthUnit === "ft" ? 0.5 : 0.1
+                    minimum: -10 * settings.depthFactor
+                    maximum: 10 * settings.depthFactor
+                    decimals: 1
+                    unit: settings.depthLabel
+                    onChangedTo: v => settings.depthOffset = v / settings.depthFactor
+                }
+                Text {
+                    width: content.width
+                    wrapMode: Text.WordWrap
+                    color: Theme.label
+                    font.pixelSize: 15
+                    // Lets the skipper check the setting against a known depth
+                    text: boat.depthValid
+                          ? "Geber misst " + (boat.depthBelowTransducer * settings.depthFactor).toFixed(1) + " " + settings.depthLabel
+                            + ", Offset " + (boat.depthOffset * settings.depthFactor).toFixed(1) + " " + settings.depthLabel
+                            + " → angezeigt " + (boat.depth * settings.depthFactor).toFixed(1) + " " + settings.depthLabel
+                            + (settings.depthOffsetMode === "manual" ? " (manuell, ersetzt den Offset des Gebers)" : "")
+                          : "Keine Tiefendaten"
+                }
+
                 Heading { text: "Navigation & Karte" }
+                ChoiceRow {
+                    label: "Overzoom (Karte über ihre Auflösung vergrößern)"
+                    options: [{ value: true, text: "Ein" }, { value: false, text: "Aus" }]
+                    current: settings.overzoom
+                    onChosen: v => settings.overzoom = v
+                }
                 StepRow {
                     label: "Ankunftskreis Wegpunkt"
                     value: settings.arrivalRadius

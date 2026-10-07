@@ -64,6 +64,21 @@ struct Depth {
     [[nodiscard]] double depth_m() const { return below_transducer_m + offset_m; }
 };
 
+// Depth offset chosen on the settings page (published by the UI).
+// nullopt: use the offset sent by the transducer (DPT / PGN 128267), or the
+// configured default when it sends none. A value replaces the transducer's
+// offset - never added to it, so it cannot be counted twice.
+struct DepthOffset {
+    std::optional<double> offset_m;
+};
+
+// Offset to use for a depth reading: user setting > transducer > configured default.
+[[nodiscard]] inline double effective_depth_offset(const std::optional<DepthOffset>& user,
+                                                   std::optional<double> from_transducer, double configured) {
+    if (user && user->offset_m) return *user->offset_m;
+    return from_transducer.value_or(configured);
+}
+
 struct WaterTemperature {
     double celsius = 0.0;
 };

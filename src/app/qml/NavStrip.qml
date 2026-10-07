@@ -11,6 +11,7 @@ Rectangle {
     radius: 6
     color: Theme.panel
     border.color: g.mode === "mob" ? Theme.danger : Theme.route
+    clip: true
     border.width: 2
 
     function nm(v) {

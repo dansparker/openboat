@@ -67,17 +67,11 @@ Item {
     }
 
     // ---- Tiles ----------------------------------------------------------------
-    readonly property var tiles: {
-        const n = Math.pow(2, zoom);
-        const x0 = Math.floor((centerX - width / 2) / 256), x1 = Math.floor((centerX + width / 2) / 256);
-        const y0 = Math.max(0, Math.floor((centerY - height / 2) / 256));
-        const y1 = Math.min(n - 1, Math.floor((centerY + height / 2) / 256));
-        const list = [];
-        for (let y = y0; y <= y1; ++y)
-            for (let x = x0; x <= x1; ++x)
-                list.push({ x: x, y: y, wx: ((x % n) + n) % n });  // wrap at the date line
-        return list;
-    }
+    // Beyond the highest zoom level of a layer its tiles are enlarged (overzoom, if
+    // enabled in the settings) - the chart then looks more detailed than its data is,
+    // so the view says so.
+    readonly property bool overzoomed: settings.overzoom && layers.some(l => zoom > l.maxZoom && zoom - l.maxZoom <= 6)
+    readonly property bool beyondChart: layers.length > 0 && layers.every(l => zoom > l.maxZoom) && !overzoomed
 
     Rectangle { anchors.fill: parent; color: Theme.water }  // shown where no chart exists
 
@@ -88,23 +82,75 @@ Item {
             required property int index
             readonly property var info: chart.layers[index] || ({})
             readonly property string layerId: info.provider || ""
+            readonly property int tileZoom: Math.min(chart.zoom, info.maxZoom || 0)
+            readonly property real tileScale: Math.pow(2, chart.zoom - tileZoom)  // > 1 when overzoomed
+            readonly property real tileSize: 256 * tileScale
             anchors.fill: parent
             opacity: Theme.chartDimming
-            // Overzoom: beyond maxZoom the layer is simply not drawn (no blurry upscaling in v0.1)
-            visible: layerId !== "" && chart.zoom >= info.minZoom && chart.zoom <= info.maxZoom
+            // Max. 6 levels of overzoom: beyond that a tile is a few blurred pixels
+            visible: layerId !== "" && chart.zoom >= info.minZoom
+                     && (chart.zoom <= info.maxZoom || (settings.overzoom && chart.zoom - info.maxZoom <= 6))
+
+            // The visible tile range as a string: the tile list (and the Images) are only
+            // rebuilt when the range changes, not on every pixel of panning - matters on a Pi
+            readonly property string tileKey: {
+                if (!visible) return "";
+                const n = Math.pow(2, tileZoom);
+                const x0 = Math.floor((chart.centerX - chart.width / 2) / tileSize);
+                const x1 = Math.floor((chart.centerX + chart.width / 2) / tileSize);
+                const y0 = Math.max(0, Math.floor((chart.centerY - chart.height / 2) / tileSize));
+                const y1 = Math.min(n - 1, Math.floor((chart.centerY + chart.height / 2) / tileSize));
+                return [tileZoom, x0, x1, y0, y1].join("/");
+            }
+            readonly property var tiles: {
+                if (tileKey === "") return [];
+                const [z, x0, x1, y0, y1] = tileKey.split("/").map(Number);
+                const n = Math.pow(2, z);
+                const list = [];
+                for (let y = y0; y <= y1; ++y)
+                    for (let x = x0; x <= x1; ++x)
+                        list.push({ x: x, y: y, wx: ((x % n) + n) % n });  // wrap at the date line
+                return list;
+            }
+
             Repeater {
-                model: chartLayer.visible ? chart.tiles : []
+                model: chartLayer.tiles
                 delegate: Image {
                     required property var modelData
-                    x: modelData.x * 256 - chart.centerX + chart.width / 2
-                    y: modelData.y * 256 - chart.centerY + chart.height / 2
-                    width: 256
-                    height: 256
+                    x: modelData.x * chartLayer.tileSize - chart.centerX + chart.width / 2
+                    y: modelData.y * chartLayer.tileSize - chart.centerY + chart.height / 2
+                    width: chartLayer.tileSize
+                    height: chartLayer.tileSize
+                    smooth: true
                     asynchronous: false  // SQLite connection belongs to the GUI thread
                     cache: true
-                    source: "image://" + chartLayer.layerId + "/" + chart.zoom + "/" + modelData.wx + "/" + modelData.y
+                    source: "image://" + chartLayer.layerId + "/" + chartLayer.tileZoom + "/" + modelData.wx + "/" + modelData.y
                 }
             }
+        }
+    }
+
+    // Overzoom warning / no chart at this zoom level
+    Rectangle {
+        visible: chart.overzoomed || chart.beyondChart
+        // top left, below the alarm banner; the bottom belongs to the guidance strip
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: 8
+        anchors.topMargin: 90
+        width: zoomNote.implicitWidth + 16
+        height: zoomNote.implicitHeight + 8
+        radius: 4
+        color: Theme.night ? "#300000" : "#fff3b0"
+        border.color: Theme.night ? "#802020" : "#c09000"
+        Text {
+            id: zoomNote
+            anchors.centerIn: parent
+            text: chart.overzoomed ? "OVERZOOM – Karte vergrößert, Details ungenau"
+                                   : "Keine Karte für diese Zoomstufe (Overzoom in Setup)"
+            color: Theme.night ? "#c03030" : "#5a4000"
+            font.pixelSize: 14
+            font.bold: true
         }
     }
 

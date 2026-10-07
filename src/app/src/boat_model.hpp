@@ -26,6 +26,8 @@ class BoatModel : public QObject {
     Q_PROPERTY(double stwKn READ stwKn NOTIFY changed)
     Q_PROPERTY(bool depthValid READ depthValid NOTIFY changed)
     Q_PROPERTY(double depth READ depth NOTIFY changed)
+    Q_PROPERTY(double depthBelowTransducer READ depthBelowTransducer NOTIFY changed)
+    Q_PROPERTY(double depthOffset READ depthOffset NOTIFY changed)  // applied offset
     Q_PROPERTY(bool windValid READ windValid NOTIFY changed)
     Q_PROPERTY(double awa READ awa NOTIFY changed)
     Q_PROPERTY(double awsKn READ awsKn NOTIFY changed)
@@ -70,6 +72,8 @@ public:
     double stwKn() const { return stw_kn_; }
     bool depthValid() const { return depth_valid_; }
     double depth() const { return depth_; }
+    double depthBelowTransducer() const { return depth_raw_; }
+    double depthOffset() const { return depth_offset_; }
     bool windValid() const { return wind_valid_; }
     double awa() const { return awa_; }
     double awsKn() const { return aws_kn_; }
@@ -114,6 +118,8 @@ private:
     double stw_kn_ = 0.0;
     bool depth_valid_ = false;
     double depth_ = 0.0;
+    double depth_raw_ = 0.0;
+    double depth_offset_ = 0.0;
     bool wind_valid_ = false;
     double awa_ = 0.0, aws_kn_ = 0.0, twd_ = 0.0, tws_kn_ = 0.0;
     bool water_valid_ = false;

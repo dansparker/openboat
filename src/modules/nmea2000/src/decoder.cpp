@@ -181,7 +181,11 @@ bool Decoder::decode(const Message& m) {
             const auto depth = r.u32(1);
             if (!depth) return false;
             const auto offset = r.s16(5);
-            bus_.publish(core::Depth{*depth * 0.01, offset ? *offset * 0.001 : options_.depth_offset_m});
+            const auto user = bus_.latest<core::DepthOffset>();
+            const std::optional<double> sent = offset ? std::optional(*offset * 0.001) : std::nullopt;
+            bus_.publish(core::Depth{*depth * 0.01,
+                                     core::effective_depth_offset(user ? std::optional(user->value) : std::nullopt,
+                                                                  sent, options_.depth_offset_m)});
             return true;
         }
         case 128259: {  // Speed, water referenced

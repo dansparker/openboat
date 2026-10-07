@@ -23,6 +23,7 @@ Settings::Settings(boat::core::DataBus& bus, QString path, const QJsonObject& co
     shallow_ = alarms.value("shallow_m").toDouble(shallow_);
     cpa_nm_ = alarms.value("cpa_nm").toDouble(cpa_nm_);
     tcpa_min_ = alarms.value("tcpa_min").toDouble(tcpa_min_);
+    depth_offset_ = config.value("depth_offset_m").toDouble(depth_offset_);
     QFile file(path_);
     if (file.open(QIODevice::ReadOnly)) {
         QJsonParseError e{};
@@ -50,6 +51,9 @@ void Settings::load(const QJsonObject& o) {
     track_recording_ = o.value("track_recording").toBool(track_recording_);
     track_spacing_ = clamp(o.value("track_spacing_m").toDouble(track_spacing_), 2.0, 500.0);
     show_track_ = o.value("show_track").toBool(show_track_);
+    overzoom_ = o.value("overzoom").toBool(overzoom_);
+    depth_offset_mode_ = unit("depth_offset_mode", depth_offset_mode_, {"transducer", "manual"});
+    depth_offset_ = clamp(o.value("depth_offset_m").toDouble(depth_offset_), -10.0, 10.0);
 }
 
 boat::nav::NavSettings Settings::navSettings() const {
@@ -67,7 +71,9 @@ void Settings::commit(bool nav, bool track) {
                         {"cpa_nm", cpa_nm_},               {"tcpa_min", tcpa_min_},
                         {"anchor_radius_m", anchor_radius_}, {"arrival_radius_m", arrival_radius_},
                         {"vector_minutes", vector_minutes_}, {"track_recording", track_recording_},
-                        {"track_spacing_m", track_spacing_}, {"show_track", show_track_}};
+                        {"track_spacing_m", track_spacing_}, {"show_track", show_track_},
+                        {"overzoom", overzoom_},           {"depth_offset_mode", depth_offset_mode_},
+                        {"depth_offset_m", depth_offset_}};
     QSaveFile file(path_);
     if (file.open(QIODevice::WriteOnly) && file.write(QJsonDocument(o).toJson()) >= 0 && file.commit()) {
         error_.clear();
@@ -136,6 +142,27 @@ void Settings::setTrackSpacing(double v) {
 void Settings::setShowTrack(bool v) {
     show_track_ = v;
     commit(false, false);
+}
+
+void Settings::setOverzoom(bool v) {
+    overzoom_ = v;
+    commit(false, false);
+}
+void Settings::setDepthOffsetMode(const QString& v) {
+    if (v != QLatin1String("transducer") && v != QLatin1String("manual")) return;
+    depth_offset_mode_ = v;
+    commit(false, false);
+    publishDepthOffset();
+}
+void Settings::setDepthOffset(double v) {
+    depth_offset_ = clamp(v, -10.0, 10.0);
+    commit(false, false);
+    publishDepthOffset();
+}
+
+void Settings::publishDepthOffset() {
+    bus_.publish(boat::core::DepthOffset{depth_offset_mode_ == QLatin1String("manual") ? std::optional(depth_offset_)
+                                                                                         : std::nullopt});
 }
 
 void Settings::exportTrack() {

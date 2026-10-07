@@ -20,7 +20,8 @@ ColumnLayout {
     DataField {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        label: "Tiefe"
+        // Reference of the shown depth (from the applied offset), like on the GPSMAP
+        label: boat.depthOffset < -0.01 ? "Tiefe unter Kiel" : boat.depthOffset > 0.01 ? "Tiefe unter Wasserlinie" : "Tiefe unter Geber"
         unit: settings.depthLabel
         valid: boat.depthValid
         value: (boat.depth * settings.depthFactor).toFixed(1)

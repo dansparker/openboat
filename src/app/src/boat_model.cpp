@@ -62,7 +62,11 @@ void BoatModel::poll() {
     if (stw) stw_kn_ = stw->stw_mps * kKnPerMps;
     const auto depth = fresh<core::Depth>(bus_, 5s);
     depth_valid_ = depth.has_value();
-    if (depth) depth_ = depth->depth_m();
+    if (depth) {
+        depth_ = depth->depth_m();
+        depth_raw_ = depth->below_transducer_m;
+        depth_offset_ = depth->offset_m;
+    }
     const auto aw = fresh<core::ApparentWind>(bus_, 3s);
     const auto tw = fresh<core::TrueWind>(bus_, 3s);
     wind_valid_ = aw && tw;

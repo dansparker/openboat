@@ -78,7 +78,11 @@ void Simulator::start(core::DataBus& bus) {
             bus.publish(s.cog);
             bus.publish(s.heading);
             bus.publish(s.stw);
-            bus.publish(s.depth);
+            core::Depth depth = s.depth;  // the simulated transducer sends an offset; the user may override it
+            const auto user = bus.latest<core::DepthOffset>();
+            depth.offset_m = core::effective_depth_offset(user ? std::optional(user->value) : std::nullopt,
+                                                          s.depth.offset_m, 0.0);
+            bus.publish(depth);
             bus.publish(s.wind);
             bus.publish(s.water);
             if (tick % 10 == 0) bus.publish(s.ais);  // AIS: every 2 s like a class A at speed

@@ -46,18 +46,18 @@ Window {
             }
 
             NavStrip {
-                anchors.left: parent.left
+                id: navStrip
+                anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
-                anchors.margins: 8
                 anchors.bottomMargin: 30
             }
 
-            // Route editor bar
+            // Route editor bar (above the guidance strip when both are shown)
             Rectangle {
                 visible: chartView.editing
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 30
+                anchors.bottomMargin: navStrip.visible ? navStrip.height + 40 : 30
                 width: editRow.implicitWidth + 16
                 height: 64
                 radius: 6

@@ -4,9 +4,9 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 
 ## v0.2 – sicher benutzbar
 - ~~Akustischer Alarm~~ ✅ (Lautsprecher über Qt Multimedia, GPIO-Summer über `buzzer` in der Konfiguration)
-- ~~Einstellungsseite~~ ✅ (Tiefenoffset noch in boat.json, wirkt nach Neustart)
+- ~~Einstellungsseite~~ ✅ inkl. Tiefenoffset (vom Geber / manuell, wirkt sofort)
 - Missweisung aus Weltmagnetfeldmodell (WMM, aus OpenEFIS übernehmbar), wenn kein Gerät sie liefert
-- Overzoom (Kacheln der höchsten Stufe vergrößern) und Kursoben-Darstellung (course-up)
+- ~~Overzoom~~ ✅ (mit Warnhinweis, abschaltbar); offen: Kursoben-Darstellung (course-up)
 - ~~Track-Aufzeichnung (GPX)~~ ✅; offen: Logbuch-Ansicht, Tracks früherer Tage anzeigen, NMEA-Mitschnitt für Replay
 - Raspberry-Pi-Image mit schreibgeschütztem Root-Dateisystem (wie OpenEFIS `image/`)
 

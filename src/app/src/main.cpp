@@ -142,6 +142,7 @@ int main(int argc, char* argv[]) {
     track.filter.min_distance_m = settings.trackSpacing();
     modules.push_back(std::make_unique<boat::track::TrackModule>(track));
 
+    // Default when the transducer sends no offset and none is set manually (settings page)
     const double depth_offset = config.value("depth_offset_m").toDouble(0.0);
     for (const auto& value : config.value("sources").toArray()) {
         try {
@@ -176,6 +177,7 @@ int main(int argc, char* argv[]) {
         c.baud = o.value("baud").toInt(4800);
         modules.push_back(std::make_unique<boat::nmea0183::Nmea0183Output>(c));
     }
+    settings.publishDepthOffset();  // before the sources start: the first depth already uses it
     for (auto& m : modules) m->start(bus);
 
     // Declared before the engine so it outlives the QML that binds to it

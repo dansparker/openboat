@@ -115,3 +115,14 @@ TEST(Nmea0183, LineAssemblerHandlesSplitChunks) {
     EXPECT_EQ(lines[0], "$GPHDT,10.0,T*00");
     EXPECT_EQ(lines[1], "$GPHDT");
 }
+
+TEST(Nmea0183, UserDepthOffsetReplacesTransducerOffset) {
+    core::DataBus bus;
+    nmea0183::Parser p(bus, {.depth_offset_m = -0.5});
+    bus.publish(core::DepthOffset{-1.2});  // keel 1.2 m below the transducer
+    p.feed(with_checksum("$SDDPT,4.2,0.3"));
+    EXPECT_NEAR(bus.latest<core::Depth>()->value.depth_m(), 3.0, 1e-9);  // not 4.2 + 0.3 - 1.2
+    bus.publish(core::DepthOffset{std::nullopt});  // back to "from transducer"
+    p.feed(with_checksum("$SDDPT,4.2,0.3"));
+    EXPECT_NEAR(bus.latest<core::Depth>()->value.depth_m(), 4.5, 1e-9);
+}

@@ -215,7 +215,9 @@ bool Parser::feed(std::string_view raw) {
     } else if (type == "DPT") {
         if (const auto d = num(field(1))) {
             const auto offset = num(field(2));
-            bus_.publish(core::Depth{*d, offset.value_or(options_.depth_offset_m)});
+            const auto user = bus_.latest<core::DepthOffset>();
+            bus_.publish(core::Depth{*d, core::effective_depth_offset(user ? std::optional(user->value) : std::nullopt,
+                                                                      offset, options_.depth_offset_m)});
             ok = true;
         }
     } else if (type == "DBT") {
@@ -225,7 +227,9 @@ bool Parser::feed(std::string_view raw) {
             if (const auto ft = num(field(1))) m = *ft * 0.3048;
         }
         if (m) {
-            bus_.publish(core::Depth{*m, options_.depth_offset_m});
+            const auto user = bus_.latest<core::DepthOffset>();
+            bus_.publish(core::Depth{*m, core::effective_depth_offset(user ? std::optional(user->value) : std::nullopt,
+                                                                      std::nullopt, options_.depth_offset_m)});
             ok = true;
         }
     } else if (type == "MWV") {
