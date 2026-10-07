@@ -94,6 +94,15 @@ double track_length_m(const std::vector<TrackPoint>& points) {
     return m;
 }
 
+std::vector<TrackPoint> thin_out(const std::vector<TrackPoint>& points, std::size_t max_points) {
+    if (max_points < 2 || points.size() <= max_points) return points;
+    const std::size_t step = (points.size() + max_points - 2) / (max_points - 1);
+    std::vector<TrackPoint> out;
+    for (std::size_t i = 0; i < points.size(); i += step) out.push_back(points[i]);
+    if (out.back().unix_ms != points.back().unix_ms) out.push_back(points.back());
+    return out;
+}
+
 std::string to_gpx(const std::vector<TrackPoint>& points, const std::string& name) {
     std::ostringstream x;
     x << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -123,6 +132,36 @@ void TrackModule::stop() {
     if (worker_.joinable()) worker_.join();
 }
 
+namespace {
+
+std::vector<TrackPoint> read_day(const std::filesystem::path& dir, const std::string& date) {
+    std::ifstream in(dir / (date + ".csv"));
+    std::stringstream text;
+    text << in.rdbuf();
+    return parse_csv(text.str());
+}
+
+bool is_date(const std::string& s) {
+    return s.size() == 10 && s[4] == '-' && s[7] == '-' &&
+           std::all_of(s.begin(), s.end(), [](char c) { return (c >= '0' && c <= '9') || c == '-'; });
+}
+
+// All recorded days except `today` (whose numbers come from memory), newest first
+std::vector<DayInfo> scan_days(const std::filesystem::path& dir, const std::string& today) {
+    std::vector<DayInfo> out;
+    std::error_code ec;
+    for (const auto& e : std::filesystem::directory_iterator(dir, ec)) {
+        const auto stem = e.path().stem().string();
+        if (e.path().extension() != ".csv" || !is_date(stem) || stem == today) continue;
+        const auto pts = read_day(dir, stem);
+        if (!pts.empty()) out.push_back({stem, track_length_m(pts), pts.size()});
+    }
+    std::sort(out.begin(), out.end(), [](const DayInfo& a, const DayInfo& b) { return a.date > b.date; });
+    return out;
+}
+
+}  // namespace
+
 void TrackModule::run(core::DataBus& bus) {
     using namespace std::chrono_literals;
     std::mutex mutex;
@@ -142,6 +181,12 @@ void TrackModule::run(core::DataBus& bus) {
     std::ofstream file;
     std::optional<TrackPoint> last;
     std::vector<TrackPoint> day_points;  // all points of `day` (for distance and export)
+    std::vector<DayInfo> earlier_days;   // scanned when the day changes
+    const auto update_days = [&] {
+        state.days.clear();
+        if (!day_points.empty()) state.days.push_back({day, state.today_m, day_points.size(), true});
+        state.days.insert(state.days.end(), earlier_days.begin(), earlier_days.end());
+    };
     bool dirty = true;
     const auto started = core::Clock::now();
 
@@ -159,6 +204,7 @@ void TrackModule::run(core::DataBus& bus) {
         state.points.assign(day_points.end() - static_cast<std::ptrdiff_t>(std::min(day_points.size(), config_.max_display_points)),
                             day_points.end());
         state.today_m = track_length_m(day_points);
+        earlier_days = scan_days(config_.dir, day);
         dirty = true;
     };
 
@@ -184,10 +230,20 @@ void TrackModule::run(core::DataBus& bus) {
                         state.points.clear();
                         break;
                     case TrackCommand::Action::ExportGpx: {
-                        const auto path = config_.dir / (day + ".gpx");
+                        const std::string d = c.day.empty() || !is_date(c.day) ? day : c.day;
+                        const auto path = config_.dir / (d + ".gpx");
                         std::ofstream out(path, std::ios::trunc);
-                        out << to_gpx(day_points, "OpenBoat " + day);
+                        out << to_gpx(d == day ? day_points : read_day(config_.dir, d), "OpenBoat " + d);
                         state.last_export = out ? path.string() : "Export fehlgeschlagen: " + path.string();
+                        break;
+                    }
+                    case TrackCommand::Action::ShowDays: {
+                        TrackHistory history;
+                        for (const auto& d : c.days) {
+                            if (!is_date(d) || d == day) continue;  // today is shown anyway
+                            history.days.push_back({d, thin_out(read_day(config_.dir, d), 3000)});
+                        }
+                        bus.publish(history);
                         break;
                     }
                 }
@@ -221,6 +277,7 @@ void TrackModule::run(core::DataBus& bus) {
         }
 
         if (dirty) {
+            update_days();
             ++state.version;
             bus.publish(state);
             dirty = false;

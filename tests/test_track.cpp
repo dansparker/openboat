@@ -124,3 +124,49 @@ TEST(TrackModule, RecordsAppendsAndExports) {
     EXPECT_TRUE(std::filesystem::exists(dir / "2026-10-08.gpx"));
     std::filesystem::remove_all(dir);
 }
+
+TEST(TrackFile, ThinOutKeepsEndsAndLimit) {
+    std::vector<track::TrackPoint> pts;
+    for (int i = 0; i < 1000; ++i) pts.push_back(at(i * 1000, core::destination(kHome, 0, 10.0 * i)));
+    const auto thin = track::thin_out(pts, 100);
+    EXPECT_LE(thin.size(), 101U);
+    EXPECT_EQ(thin.front().unix_ms, 0);
+    EXPECT_EQ(thin.back().unix_ms, 999000);
+    EXPECT_EQ(track::thin_out(pts, 2000).size(), 1000U);
+}
+
+TEST(TrackModule, ListsAndShowsEarlierDays) {
+    const auto dir = std::filesystem::temp_directory_path() / "openboat-track-history";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    {
+        std::ofstream f(dir / "2026-10-01.csv");
+        f << track::to_csv_line(at(core::unix_ms(2026, 10, 1, 9, 0, 0), kHome));
+        f << track::to_csv_line(at(core::unix_ms(2026, 10, 1, 9, 1, 0), core::destination(kHome, 0, 100)));
+        std::ofstream junk(dir / "notes.csv");  // not a track file: ignored
+        junk << "hello\n";
+    }
+    core::DataBus bus;
+    track::TrackModule m({dir, false, {}, 100});
+    m.start(bus);
+    bus.publish(core::UtcTime{core::unix_ms(2026, 10, 8, 10, 0, 0)});
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    track::TrackCommand c;
+    c.action = track::TrackCommand::Action::ShowDays;
+    c.days = {"2026-10-01", "../etc/passwd"};
+    bus.publish(c);
+    bus.publish(core::UtcTime{core::unix_ms(2026, 10, 8, 10, 0, 1)});
+    std::this_thread::sleep_for(std::chrono::milliseconds(1300));
+    m.stop();
+
+    const auto state = bus.latest<track::TrackState>();
+    ASSERT_TRUE(state);
+    ASSERT_EQ(state->value.days.size(), 1U);
+    EXPECT_EQ(state->value.days[0].date, "2026-10-01");
+    EXPECT_NEAR(state->value.days[0].length_m, 100.0, 0.5);
+    const auto history = bus.latest<track::TrackHistory>();
+    ASSERT_TRUE(history);
+    ASSERT_EQ(history->value.days.size(), 1U);  // the path traversal attempt is rejected
+    EXPECT_EQ(history->value.days[0].points.size(), 2U);
+    std::filesystem::remove_all(dir);
+}

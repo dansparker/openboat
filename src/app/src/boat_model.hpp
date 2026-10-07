@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QVariantList>
+#include <QStringList>
 #include <QVariantMap>
 
 #include "boat/core/data_bus.hpp"
@@ -55,6 +56,10 @@ class BoatModel : public QObject {
     Q_PROPERTY(double trackTodayNm READ trackTodayNm NOTIFY changed)
     Q_PROPERTY(bool timeFromGnss READ timeFromGnss NOTIFY changed)
     Q_PROPERTY(QString trackExport READ trackExport NOTIFY changed)
+    // Recorded days [{ date, lengthNm, shown }], newest first
+    Q_PROPERTY(QVariantList trackDays READ trackDays NOTIFY trackChanged)
+    // Earlier days selected for display [{ date, points: [{lat, lon}] }]
+    Q_PROPERTY(QVariantList trackHistory READ trackHistory NOTIFY trackHistoryChanged)
 
 public:
     explicit BoatModel(boat::core::DataBus& bus, QObject* parent = nullptr);
@@ -94,6 +99,11 @@ public:
     double trackTodayNm() const { return track_today_nm_; }
     bool timeFromGnss() const { return time_from_gnss_; }
     QString trackExport() const { return track_export_; }
+    QVariantList trackDays() const { return track_days_; }
+    QVariantList trackHistory() const { return track_history_; }
+
+    Q_INVOKABLE void setTrackDayShown(const QString& date, bool shown);
+    Q_INVOKABLE void exportTrackDay(const QString& date);
 
     Q_INVOKABLE void dropAnchor(double radius_m);
     Q_INVOKABLE void raiseAnchor();
@@ -102,6 +112,7 @@ public:
 signals:
     void changed();
     void trackChanged();
+    void trackHistoryChanged();
 
 private:
     void poll();
@@ -135,4 +146,8 @@ private:
     double track_today_nm_ = 0.0;
     bool time_from_gnss_ = false;
     QString track_export_;
+    QVariantList track_days_;
+    QStringList shown_days_;
+    QVariantList track_history_;
+    long long history_stamp_ = 0;
 };

@@ -67,6 +67,37 @@ Rectangle {
                     }
                 }
 
+                Text { text: "Tracks"; color: Theme.label; font.pixelSize: 16; visible: boat.trackDays.length > 0 }
+                Repeater {
+                    model: boat.trackDays
+                    RowLayout {
+                        required property var modelData
+                        required property int index
+                        width: content.width
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.date + (modelData.today ? " (heute)" : "")
+                                  + "   " + page.nm(modelData.lengthNm)
+                            color: Theme.text; font.pixelSize: 17; elide: Text.ElideRight
+                        }
+                        TouchButton {
+                            visible: !modelData.today  // today is always on the chart
+                            text: "Zeigen"; fontSize: 14; implicitHeight: 44
+                            checked: modelData.shown
+                            onClicked: boat.setTrackDayShown(modelData.date, !modelData.shown)
+                        }
+                        TouchButton { text: "GPX"; fontSize: 14; implicitHeight: 44; onClicked: boat.exportTrackDay(modelData.date) }
+                    }
+                }
+                Text {
+                    visible: boat.trackExport !== ""
+                    width: content.width
+                    wrapMode: Text.WrapAnywhere
+                    text: "Export: " + boat.trackExport
+                    color: Theme.label
+                    font.pixelSize: 13
+                }
+
                 Text { text: "Wegpunkte"; color: Theme.label; font.pixelSize: 16; visible: routes.waypoints.length > 0 }
                 Repeater {
                     model: routes.waypoints
@@ -85,7 +116,7 @@ Rectangle {
                 }
 
                 Text {
-                    visible: routes.routes.length === 0 && routes.waypoints.length === 0
+                    visible: routes.routes.length === 0 && routes.waypoints.length === 0 && boat.trackDays.length === 0
                     width: content.width
                     wrapMode: Text.WordWrap
                     text: "Noch nichts gespeichert. Lange auf die Karte drücken, um einen Wegpunkt zu setzen, oder „Neue Route“ und Punkte antippen."

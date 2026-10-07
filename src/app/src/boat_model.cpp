@@ -36,6 +36,22 @@ void BoatModel::dropAnchor(double radius_m) {
 
 void BoatModel::raiseAnchor() { bus_.publish(boat::nav::AnchorCommand{boat::nav::AnchorCommand::Action::Raise, 0.0}); }
 
+void BoatModel::setTrackDayShown(const QString& date, bool shown) {
+    shown_days_.removeAll(date);
+    if (shown) shown_days_.append(date);
+    boat::track::TrackCommand c;
+    c.action = boat::track::TrackCommand::Action::ShowDays;
+    for (const auto& d : shown_days_) c.days.push_back(d.toStdString());
+    bus_.publish(c);
+}
+
+void BoatModel::exportTrackDay(const QString& date) {
+    boat::track::TrackCommand c;
+    c.action = boat::track::TrackCommand::Action::ExportGpx;
+    c.day = date.toStdString();
+    bus_.publish(c);
+}
+
 void BoatModel::acknowledgeAlarms() { bus_.publish(boat::nav::AlarmAcknowledge{}); }
 
 void BoatModel::poll() {
@@ -156,12 +172,38 @@ void BoatModel::poll() {
         track_export_ = QString::fromStdString(s.last_export);
         if (s.version != track_version_) {
             track_version_ = s.version;
+            track_days_.clear();
+            for (const auto& d : s.days) {
+                const QString date = QString::fromStdString(d.date);
+                track_days_.append(QVariantMap{{QStringLiteral("date"), date},
+                                               {QStringLiteral("lengthNm"), d.length_m / core::kMetresPerNm},
+                                               {QStringLiteral("shown"), shown_days_.contains(date)},
+                                               {QStringLiteral("today"), d.today}});
+            }
             track_.clear();
             track_.reserve(static_cast<qsizetype>(s.points.size()));
             for (const auto& p : s.points) {
                 track_.append(QVariantMap{{QStringLiteral("lat"), p.point.lat_deg}, {QStringLiteral("lon"), p.point.lon_deg}});
             }
             emit trackChanged();
+        }
+    }
+    // Earlier days: converted only when a new history was published
+    if (const auto h = bus_.latest<boat::track::TrackHistory>()) {
+        const auto stamp = h->timestamp.time_since_epoch().count();
+        if (stamp != history_stamp_) {
+            history_stamp_ = stamp;
+            track_history_.clear();
+            for (const auto& day : h->value.days) {
+                QVariantList pts;
+                pts.reserve(static_cast<qsizetype>(day.points.size()));
+                for (const auto& p : day.points) {
+                    pts.append(QVariantMap{{QStringLiteral("lat"), p.point.lat_deg}, {QStringLiteral("lon"), p.point.lon_deg}});
+                }
+                track_history_.append(QVariantMap{{QStringLiteral("date"), QString::fromStdString(day.date)},
+                                                  {QStringLiteral("points"), pts}});
+            }
+            emit trackHistoryChanged();
         }
     }
     emit changed();

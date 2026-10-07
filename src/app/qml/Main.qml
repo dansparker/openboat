@@ -209,7 +209,7 @@ Window {
                 TouchButton {
                     Layout.fillWidth: true
                     fontSize: 16
-                    text: "Routen"
+                    text: "Routen/Tracks"
                     checked: navPage.visible
                     onClicked: { settingsPage.visible = false; navPage.visible = !navPage.visible; }
                 }

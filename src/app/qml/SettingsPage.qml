@@ -185,6 +185,12 @@ Rectangle {
 
                 Heading { text: "Navigation & Karte" }
                 ChoiceRow {
+                    label: "Ausrichtung"
+                    options: [{ value: "north", text: "Nord oben" }, { value: "course", text: "Kurs oben" }]
+                    current: settings.orientation
+                    onChosen: v => settings.orientation = v
+                }
+                ChoiceRow {
                     label: "Overzoom (Karte über ihre Auflösung vergrößern)"
                     options: [{ value: true, text: "Ein" }, { value: false, text: "Aus" }]
                     current: settings.overzoom

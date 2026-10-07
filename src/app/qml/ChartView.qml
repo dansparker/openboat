@@ -29,6 +29,33 @@ Item {
 
     readonly property real worldSize: 256 * Math.pow(2, zoom)
 
+    // ---- Orientation ----------------------------------------------------------
+    // Course-up: the chart content is rotated by -upDeg around the view centre,
+    // and the boat sits lower in the view to show more of what lies ahead.
+    readonly property bool courseUp: settings.orientation === "course"
+    property real upDeg: 0
+    readonly property real lookAhead: courseUp ? height * 0.25 : 0
+    onCourseUpChanged: { updateUp(); recentre(); overlay.requestPaint(); }
+
+    // Only rotate after a clear course change: a chart that wobbles with every
+    // wave is unreadable. COG when moving, else the compass heading.
+    function updateUp() {
+        if (!courseUp) { upDeg = 0; return; }
+        const target = boat.cogValid && boat.sogKn > 1.0 ? boat.cog : boat.headingValid ? boat.heading : upDeg;
+        let diff = ((target - upDeg) % 360 + 540) % 360 - 180;
+        if (Math.abs(diff) > 5) upDeg = (target % 360 + 360) % 360;
+    }
+    // Rotate a vector by a (degrees, clockwise on screen)
+    function rot(x, y, a) {
+        const r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+        return { x: x * c - y * s, y: x * s + y * c };
+    }
+    // Screen position -> unrotated chart position
+    function unrotate(x, y) {
+        const v = rot(x - width / 2, y - height / 2, upDeg);
+        return { x: width / 2 + v.x, y: height / 2 + v.y };
+    }
+
     function worldX(lon) { return (lon + 180) / 360 * worldSize; }
     function worldY(lat) {
         const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
@@ -46,8 +73,9 @@ Item {
 
     function recentre() {
         if (!boat.positionValid) return;
-        centerX = worldX(boat.longitude);
-        centerY = worldY(boat.latitude);
+        const r = upDeg * Math.PI / 180;
+        centerX = worldX(boat.longitude) + lookAhead * Math.sin(r);
+        centerY = worldY(boat.latitude) - lookAhead * Math.cos(r);
     }
     function setZoom(z) {
         z = Math.max(minZoom, Math.min(maxZoom, z));
@@ -61,6 +89,7 @@ Item {
     Connections {
         target: boat
         function onChanged() {
+            chart.updateUp();
             if (chart.follow) chart.recentre();
             overlay.requestPaint();
         }
@@ -87,6 +116,7 @@ Item {
             readonly property real tileSize: 256 * tileScale
             anchors.fill: parent
             opacity: Theme.chartDimming
+            transform: Rotation { origin.x: chart.width / 2; origin.y: chart.height / 2; angle: -chart.upDeg }
             // Max. 6 levels of overzoom: beyond that a tile is a few blurred pixels
             visible: layerId !== "" && chart.zoom >= info.minZoom
                      && (chart.zoom <= info.maxZoom || (settings.overzoom && chart.zoom - info.maxZoom <= 6))
@@ -96,10 +126,13 @@ Item {
             readonly property string tileKey: {
                 if (!visible) return "";
                 const n = Math.pow(2, tileZoom);
-                const x0 = Math.floor((chart.centerX - chart.width / 2) / tileSize);
-                const x1 = Math.floor((chart.centerX + chart.width / 2) / tileSize);
-                const y0 = Math.max(0, Math.floor((chart.centerY - chart.height / 2) / tileSize));
-                const y1 = Math.min(n - 1, Math.floor((chart.centerY + chart.height / 2) / tileSize));
+                // rotated view: cover the circle around the centre, not just the rectangle
+                const half = chart.upDeg !== 0 ? Math.hypot(chart.width, chart.height) / 2 : -1;
+                const hw = half > 0 ? half : chart.width / 2, hh = half > 0 ? half : chart.height / 2;
+                const x0 = Math.floor((chart.centerX - hw) / tileSize);
+                const x1 = Math.floor((chart.centerX + hw) / tileSize);
+                const y0 = Math.max(0, Math.floor((chart.centerY - hh) / tileSize));
+                const y1 = Math.min(n - 1, Math.floor((chart.centerY + hh) / tileSize));
                 return [tileZoom, x0, x1, y0, y1].join("/");
             }
             readonly property var tiles: {
@@ -154,56 +187,73 @@ Item {
         }
     }
 
-    // ---- Track -----------------------------------------------------------------
-    // GPU-drawn polyline. Points are converted to world pixels only when the
-    // track or the zoom changes; panning just moves the container. Coordinates
-    // are relative to the first point: absolute world pixels at zoom 18 exceed
-    // float precision in the scene graph.
-    Item {
-        id: trackLayer
-        visible: settings.showTrack && trackPath.path.length > 1
+    // ---- Tracks -----------------------------------------------------------------
+    // GPU-drawn polylines. Points are converted to world pixels only when the
+    // points or the zoom change; panning just moves the item. Coordinates are
+    // relative to the first point: absolute world pixels at zoom 18 exceed float
+    // precision in the scene graph.
+    component TrackLine: Item {
+        id: line
+        property var points: []
+        property color colour: Theme.track
+        property real lineWidth: 3
+        property var dash: []
         property real originX: 0
         property real originY: 0
         x: originX - chart.centerX + chart.width / 2
         y: originY - chart.centerY + chart.height / 2
+        visible: settings.showTrack && path.path.length > 1
+        // rotation origin in own coordinates = view centre
+        transform: Rotation { origin.x: chart.width / 2 - line.x; origin.y: chart.height / 2 - line.y; angle: -chart.upDeg }
 
         function rebuild() {
-            const pts = boat.track;
-            if (pts.length === 0) { trackPath.path = []; return; }
+            const pts = points;
+            if (!pts || pts.length === 0) { path.path = []; return; }
             originX = chart.worldX(pts[0].lon);
             originY = chart.worldY(pts[0].lat);
             const out = new Array(pts.length);
             for (let i = 0; i < pts.length; ++i)
                 out[i] = Qt.point(chart.worldX(pts[i].lon) - originX, chart.worldY(pts[i].lat) - originY);
-            trackPath.path = out;
+            path.path = out;
+        }
+        onPointsChanged: rebuild()
+        Connections {
+            target: chart
+            function onZoomChanged() { line.rebuild(); }
         }
 
         Shape {
             ShapePath {
-                strokeColor: Theme.track
-                strokeWidth: 3
+                strokeColor: line.colour
+                strokeWidth: line.lineWidth
                 fillColor: "transparent"
                 capStyle: ShapePath.RoundCap
                 joinStyle: ShapePath.RoundJoin
-                PathPolyline { id: trackPath }
+                strokeStyle: line.dash.length > 0 ? ShapePath.DashLine : ShapePath.SolidLine
+                dashPattern: line.dash.length > 0 ? line.dash : [4, 2]
+                PathPolyline { id: path }
             }
         }
-
-        Connections {
-            target: boat
-            function onTrackChanged() { trackLayer.rebuild(); }
-        }
-        Connections {
-            target: chart
-            function onZoomChanged() { trackLayer.rebuild(); }
-        }
-        Component.onCompleted: rebuild()
     }
+
+    // Earlier days (dashed, lighter), below today
+    Repeater {
+        model: boat.trackHistory
+        TrackLine {
+            required property var modelData
+            points: modelData.points
+            colour: Theme.trackOld
+            lineWidth: 2.5
+            dash: [3, 2]
+        }
+    }
+    TrackLine { points: boat.track }
 
     // ---- Vectors (own ship, AIS, anchor) --------------------------------------
     Canvas {
         id: overlay
         anchors.fill: parent
+        transform: Rotation { origin.x: chart.width / 2; origin.y: chart.height / 2; angle: -chart.upDeg }
         renderStrategy: Canvas.Cooperative
 
         function shipPolygon(ctx, x, y, angleDeg, size) {
@@ -364,14 +414,23 @@ Item {
             if (!moved && Math.abs(mouse.x - lastX) + Math.abs(mouse.y - lastY) < 12) return;
             moved = true;
             chart.follow = false;
-            chart.centerX -= mouse.x - lastX;
-            chart.centerY -= mouse.y - lastY;
+            const d = chart.rot(mouse.x - lastX, mouse.y - lastY, chart.upDeg);  // screen -> chart direction
+            chart.centerX -= d.x;
+            chart.centerY -= d.y;
             lastX = mouse.x;
             lastY = mouse.y;
             overlay.requestPaint();
         }
-        onClicked: mouse => { if (!moved) chart.tapped(chart.latAt(mouse.y), chart.lonAt(mouse.x)); }
-        onPressAndHold: mouse => { if (!moved) chart.longPressed(chart.latAt(mouse.y), chart.lonAt(mouse.x), mouse.x, mouse.y); }
+        onClicked: mouse => {
+            if (moved) return;
+            const p = chart.unrotate(mouse.x, mouse.y);
+            chart.tapped(chart.latAt(p.y), chart.lonAt(p.x));
+        }
+        onPressAndHold: mouse => {
+            if (moved) return;
+            const p = chart.unrotate(mouse.x, mouse.y);
+            chart.longPressed(chart.latAt(p.y), chart.lonAt(p.x), mouse.x, mouse.y);
+        }
         onWheel: wheel => { chart.setZoom(chart.zoom + (wheel.angleDelta.y > 0 ? 1 : -1)); overlay.requestPaint(); }
     }
     PinchHandler {
@@ -407,4 +466,38 @@ Item {
     }
 
     Component.onCompleted: recentre()
+
+    // North arrow; tap toggles north-up / course-up
+    Rectangle {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 10
+        anchors.topMargin: 90
+        width: 54
+        height: 54
+        radius: 27
+        color: Theme.panel
+        border.color: chart.courseUp ? Theme.accent : Theme.panelBorder
+        border.width: 2
+        Item {
+            anchors.fill: parent
+            rotation: -chart.upDeg
+            Text { anchors.horizontalCenter: parent.horizontalCenter; y: 3; text: "N"; color: Theme.text; font.pixelSize: 15; font.bold: true }
+            Text { anchors.centerIn: parent; anchors.verticalCenterOffset: 6; text: "▲"; color: Theme.danger; font.pixelSize: 16 }
+        }
+        Text {
+            anchors.top: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.topMargin: 2
+            text: chart.courseUp ? "Kurs oben" : "Nord oben"
+            color: Theme.overlayText
+            style: Text.Outline
+            styleColor: Theme.overlayOutline
+            font.pixelSize: 12
+        }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: settings.orientation = chart.courseUp ? "north" : "course"
+        }
+    }
 }

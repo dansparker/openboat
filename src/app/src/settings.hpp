@@ -38,6 +38,7 @@ class Settings : public QObject {
     Q_PROPERTY(double trackSpacing READ trackSpacing WRITE setTrackSpacing NOTIFY changed)
     Q_PROPERTY(bool showTrack READ showTrack WRITE setShowTrack NOTIFY changed)
     Q_PROPERTY(bool overzoom READ overzoom WRITE setOverzoom NOTIFY changed)
+    Q_PROPERTY(QString orientation READ orientation WRITE setOrientation NOTIFY changed)  // "north" | "course"
 
     // Depth offset: "transducer" (use what the transducer sends) or "manual" (depthOffset
     // replaces it). Metres; < 0: depth below keel, > 0: depth below waterline.
@@ -68,6 +69,7 @@ public:
     double trackSpacing() const { return track_spacing_; }
     bool showTrack() const { return show_track_; }
     bool overzoom() const { return overzoom_; }
+    QString orientation() const { return orientation_; }
     QString depthOffsetMode() const { return depth_offset_mode_; }
     double depthOffset() const { return depth_offset_; }
     QString lastError() const { return error_; }
@@ -85,6 +87,7 @@ public:
     void setTrackSpacing(double v);
     void setShowTrack(bool v);
     void setOverzoom(bool v);
+    void setOrientation(const QString& v);
     void setDepthOffsetMode(const QString& v);
     void setDepthOffset(double v);
 
@@ -119,6 +122,7 @@ private:
     double track_spacing_ = 10.0;
     bool show_track_ = true;
     bool overzoom_ = true;
+    QString orientation_ = QStringLiteral("north");
     QString depth_offset_mode_ = QStringLiteral("transducer");
     double depth_offset_ = 0.0;
     QString error_;

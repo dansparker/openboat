@@ -70,7 +70,9 @@ jobs:
       - name: Smoke test + screenshots (simulator, no QML errors)
         run: |
           app=./build/release/src/app/openboat
-          for mode in day night settings track; do
+          for mode in day night settings track courseup; do
+            rm -f config/settings.json
+            [ "$mode" = courseup ] && echo '{"orientation": "course"}' > config/settings.json
             flag=""; [ "$mode" = night ] && flag="--night"; [ "$mode" = settings ] && flag="--page settings"
             [ "$mode" = track ] && flag="--zoom 18"
             set +e

@@ -49,12 +49,37 @@ struct FilterSettings {
 [[nodiscard]] std::string to_gpx(const std::vector<TrackPoint>& points, const std::string& name);
 [[nodiscard]] std::string utc_date(std::int64_t unix_ms);  // "YYYY-MM-DD"
 [[nodiscard]] double track_length_m(const std::vector<TrackPoint>& points);
+// Keeps every n-th point (and always the last) so that at most `max_points` remain.
+[[nodiscard]] std::vector<TrackPoint> thin_out(const std::vector<TrackPoint>& points, std::size_t max_points);
 
 // UI -> TrackModule
 struct TrackCommand {
-    enum class Action : std::uint8_t { SetRecording, ClearDisplay, ExportGpx } action = Action::SetRecording;
+    enum class Action : std::uint8_t {
+        SetRecording,
+        ClearDisplay,
+        ExportGpx,   // `day` ("YYYY-MM-DD"), empty = today
+        ShowDays,    // load `days` for display (TrackHistory); empty = hide all
+    } action = Action::SetRecording;
     bool recording = true;
     FilterSettings filter;  // applied with SetRecording
+    std::string day;
+    std::vector<std::string> days;
+};
+
+struct DayInfo {
+    std::string date;  // "YYYY-MM-DD" (UTC)
+    double length_m = 0.0;
+    std::size_t points = 0;
+    bool today = false;  // the day currently being recorded
+};
+
+// Tracks of earlier days selected for display (thinned out for drawing)
+struct TrackHistory {
+    struct Day {
+        std::string date;
+        std::vector<TrackPoint> points;
+    };
+    std::vector<Day> days;
 };
 
 // TrackModule -> UI (published when something changed)
@@ -65,6 +90,7 @@ struct TrackState {
     double today_m = 0.0;                // distance logged today
     std::string last_export;             // path of the last GPX export, or error text
     bool time_from_gnss = false;
+    std::vector<DayInfo> days;  // all recorded days, newest first (today included)
 };
 
 struct TrackConfig {
