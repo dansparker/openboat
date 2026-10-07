@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QVariantList>
+#include <QVariantMap>
 
 #include "boat/core/data_bus.hpp"
 
@@ -42,6 +43,10 @@ class BoatModel : public QObject {
     Q_PROPERTY(double anchorRadius READ anchorRadius NOTIFY changed)
     Q_PROPERTY(double anchorDistance READ anchorDistance NOTIFY changed)
     Q_PROPERTY(QVariantList aisTargets READ aisTargets NOTIFY changed)
+    // Active waypoint navigation: { active, mode ("goto"|"route"|"mob"), target, routeName, leg, legs,
+    //   dtwNm, btw, xteNm, ttgMin, remainingNm, arrived, from: {lat, lon} | null, points: [{name, lat, lon}] }
+    // Values are -1 when unknown (no fix).
+    Q_PROPERTY(QVariantMap guidance READ guidance NOTIFY changed)
 
 public:
     explicit BoatModel(boat::core::DataBus& bus, QObject* parent = nullptr);
@@ -73,6 +78,7 @@ public:
     double anchorRadius() const { return anchor_radius_; }
     double anchorDistance() const { return anchor_distance_; }
     QVariantList aisTargets() const { return ais_; }
+    QVariantMap guidance() const { return guidance_; }
 
     Q_INVOKABLE void dropAnchor(double radius_m);
     Q_INVOKABLE void raiseAnchor();
@@ -104,4 +110,5 @@ private:
     bool anchor_active_ = false;
     double anchor_lat_ = 0.0, anchor_lon_ = 0.0, anchor_radius_ = 0.0, anchor_distance_ = 0.0;
     QVariantList ais_;
+    QVariantMap guidance_;
 };

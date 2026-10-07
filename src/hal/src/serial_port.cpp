@@ -36,7 +36,7 @@ speed_t to_speed(int baud) {
 
 SerialPort::SerialPort(const std::string& device, int baud) {
     const speed_t speed = to_speed(baud);
-    fd_ = ::open(device.c_str(), O_RDONLY | O_NOCTTY | O_CLOEXEC);
+    fd_ = ::open(device.c_str(), O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (fd_ < 0) throw std::system_error(errno, std::system_category(), "open " + device);
 
     termios tty{};
@@ -77,7 +77,21 @@ std::optional<std::size_t> SerialPort::read(std::span<std::byte> buffer, std::ch
     return static_cast<std::size_t>(n);
 }
 
+void SerialPort::write_all(std::span<const std::byte> data) {
+    std::size_t done = 0;
+    while (done < data.size()) {
+        const auto n = ::write(fd_, data.data() + done, data.size() - done);
+        if (n < 0) {
+            if (errno == EINTR || errno == EAGAIN) continue;
+            throw std::system_error(errno, std::system_category(), "serial write");
+        }
+        done += static_cast<std::size_t>(n);
+    }
+}
+
 #else
+
+void SerialPort::write_all(std::span<const std::byte> /*data*/) {}
 
 SerialPort::SerialPort(const std::string& device, int /*baud*/) {
     throw std::runtime_error("serial port " + device + ": only supported on Linux");

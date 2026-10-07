@@ -85,6 +85,11 @@ UdpSocket::UdpSocket() {
     if (s == kInvalidSocket) {
         fail("socket");
     }
+    // Broadcast: NMEA over WLAN is usually sent to 255.255.255.255:10110.
+    // Reuse: other programs (e.g. OpenCPN) may listen on the same port.
+    const int on = 1;
+    ::setsockopt(s, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&on), static_cast<socklen_t>(sizeof on));
+    ::setsockopt(s, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&on), static_cast<socklen_t>(sizeof on));
     handle_ = static_cast<std::intptr_t>(s);
 }
 

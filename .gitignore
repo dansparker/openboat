@@ -18,3 +18,4 @@ charts/*
 *.mbtiles
 *.000
 logs/
+config/navigation.gpx

@@ -19,9 +19,9 @@ option(BOAT_BUILD_TESTS "Build unit tests"                     ON)
 # --- Qt-free libraries (portable, unit-testable) ---------------------------
 add_subdirectory(src/core)
 add_subdirectory(src/hal)
+add_subdirectory(src/modules/nav)
 add_subdirectory(src/modules/nmea0183)
 add_subdirectory(src/modules/nmea2000)
-add_subdirectory(src/modules/nav)
 add_subdirectory(src/modules/sim)
 add_subdirectory(src/modules/buzzer)
 

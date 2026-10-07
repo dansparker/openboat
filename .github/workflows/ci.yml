@@ -51,6 +51,14 @@ jobs:
         run: cmake --preset release -DBOAT_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build --preset release
+      - name: Base chart for the simulator area (cached; rebuilt when the tool changes)
+        uses: actions/cache@v4
+        with:
+          path: charts/base.mbtiles
+          key: basemap-attersee-${{ hashFiles('tools/make_basemap.py') }}
+      - name: Render base chart from OpenStreetMap if not cached
+        run: |
+          test -f charts/base.mbtiles || { pip install pillow && python3 tools/make_basemap.py --bbox 13.50,47.84,13.62,47.95 --zooms 11-15 --out charts/base.mbtiles; }
       - name: Seamark overlay for the simulator area (small, cached)
         uses: actions/cache@v4
         with:
@@ -64,8 +72,13 @@ jobs:
           app=./build/release/src/app/openboat
           for mode in day night; do
             flag=""; [ "$mode" = night ] && flag="--night"
-            QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
+            set +e
+            QT_DEBUG_PLUGINS=0 QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json --demo $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
+            rc=$?
+            set -e
             cat app-$mode.log
+            echo "exit code: $rc"
+            test $rc -eq 0
             ! grep -E "TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign" app-$mode.log
           done
       - uses: actions/upload-artifact@v4

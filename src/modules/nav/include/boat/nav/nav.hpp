@@ -20,6 +20,7 @@
 #include "boat/core/data_bus.hpp"
 #include "boat/core/marine_data.hpp"
 #include "boat/core/module.hpp"
+#include "boat/nav/route.hpp"
 
 namespace boat::nav {
 
@@ -66,7 +67,7 @@ private:
 
 // ---- Alarms -----------------------------------------------------------------
 
-enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival };
+enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival, Mob };
 
 // Alarm: immediate danger, continuous fast beeping until acknowledged.
 // Warning: degraded information, short double beep every few seconds.
@@ -143,7 +144,11 @@ private:
 struct NavSettings {
     AisSettings ais;
     AlarmSettings alarms;
+    NavigatorSettings navigator;
 };
+
+// Alarms raised by waypoint navigation (arrival, MOB).
+[[nodiscard]] std::vector<Alarm> guidance_alarms(const Guidance& g);
 
 class NavModule final : public core::Module {
 public:

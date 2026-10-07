@@ -8,6 +8,8 @@ set(BOAT_QML_FILES
     qml/DataBar.qml
     qml/DataField.qml
     qml/AlarmBanner.qml
+    qml/NavStrip.qml
+    qml/NavPage.qml
     qml/TouchButton.qml)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -28,6 +30,8 @@ qt_add_qml_module(boat_ui
         src/alarm_sound.cpp
         src/boat_model.hpp
         src/boat_model.cpp
+        src/route_store.hpp
+        src/route_store.cpp
         src/mbtiles_provider.hpp
         src/mbtiles_provider.cpp
     QML_FILES

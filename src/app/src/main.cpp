@@ -1,11 +1,13 @@
 #include "alarm_sound.hpp"
 #include "boat_model.hpp"
 #include "mbtiles_provider.hpp"
+#include "route_store.hpp"
 
 #include "boat/buzzer/buzzer.hpp"
 #include "boat/core/data_bus.hpp"
 #include "boat/hal/can_bus.hpp"
 #include "boat/nav/nav.hpp"
+#include "boat/nmea0183/output.hpp"
 #include "boat/nmea0183/source.hpp"
 #include "boat/nmea2000/source.hpp"
 #include "boat/sim/simulator.hpp"
@@ -111,7 +113,9 @@ int main(int argc, char* argv[]) {
                                       QStringLiteral("file"));
     QCommandLineOption delay_opt(QStringLiteral("screenshot-delay"), QStringLiteral("Delay in ms"),
                                  QStringLiteral("ms"), QStringLiteral("8000"));
-    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt});
+    QCommandLineOption demo_opt(QStringLiteral("demo"),
+                                QStringLiteral("Start a demo route near the simulator (screenshots, trying out)"));
+    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt, demo_opt});
     cli.process(app);
 
     const QString config_path = cli.value(config_opt);
@@ -155,11 +159,23 @@ int main(int argc, char* argv[]) {
             qWarning() << "OpenBoat: GPIO buzzer not available:" << e.what();
         }
     }
+    // NMEA 0183 output for an autopilot (RMB/APB/XTE)
+    if (const QJsonObject o = config.value("autopilot_output").toObject(); !o.isEmpty()) {
+        boat::nmea0183::OutputConfig c;
+        c.kind = o.value("kind").toString("udp") == "serial" ? boat::nmea0183::OutputConfig::Kind::Serial
+                                                             : boat::nmea0183::OutputConfig::Kind::Udp;
+        c.host = o.value("host").toString("255.255.255.255").toStdString();
+        c.port = static_cast<std::uint16_t>(o.value("port").toInt(10110));
+        c.device = o.value("device").toString().toStdString();
+        c.baud = o.value("baud").toInt(4800);
+        modules.push_back(std::make_unique<boat::nmea0183::Nmea0183Output>(c));
+    }
     for (auto& m : modules) m->start(bus);
 
     // Declared before the engine so it outlives the QML that binds to it
     BoatModel model(bus);
     AlarmSound sound(bus);
+    RouteStore routes(bus, resolve(base_dir, config.value("navigation_file").toString("navigation.gpx")));
     if (!AlarmSound::available() && !config.contains("buzzer")) {
         qWarning() << "OpenBoat: NO AUDIBLE ALARM - built without Qt Multimedia and no GPIO buzzer configured";
     }
@@ -183,6 +199,7 @@ int main(int argc, char* argv[]) {
 
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
+    engine.rootContext()->setContextProperty(QStringLiteral("routes"), &routes);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
     engine.rootContext()->setContextProperty(QStringLiteral("startNight"), cli.isSet(night_opt));
     QObject::connect(
@@ -190,6 +207,14 @@ int main(int argc, char* argv[]) {
         Qt::QueuedConnection);
     engine.loadFromModule("OpenBoat", "Main");
 
+    if (cli.isSet(demo_opt)) {
+        QTimer::singleShot(1500, &app, [&bus] {
+            boat::nav::NavCommand c;
+            c.action = boat::nav::NavCommand::Action::StartRoute;
+            c.route = {"Demo", {{"Litzlberg", {47.9255, 13.5560}}, {"Kammer", {47.9310, 13.5900}}, {"Weyregg", {47.9050, 13.5730}}}};
+            bus.publish(c);
+        });
+    }
     if (cli.isSet(screenshot_opt)) {
         QTimer::singleShot(cli.value(delay_opt).toInt(), &app, [&engine, file = cli.value(screenshot_opt)] {
             auto* window = engine.rootObjects().isEmpty() ? nullptr

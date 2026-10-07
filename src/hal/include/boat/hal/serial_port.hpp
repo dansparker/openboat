@@ -24,6 +24,8 @@ public:
     // Waits up to `timeout`: nullopt on timeout. Throws when the device is gone.
     [[nodiscard]] std::optional<std::size_t> read(std::span<std::byte> buffer, std::chrono::milliseconds timeout);
 
+    void write_all(std::span<const std::byte> data);  // throws std::system_error
+
 private:
     int fd_{-1};
 };

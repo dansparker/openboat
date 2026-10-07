@@ -114,5 +114,34 @@ void BoatModel::poll() {
             ais_.append(m);
         }
     }
+    guidance_.clear();
+    const auto g = fresh<boat::nav::Guidance>(bus_, 5s);
+    guidance_[QStringLiteral("active")] = g && g->mode != boat::nav::NavMode::None;
+    if (g && g->mode != boat::nav::NavMode::None) {
+        const auto nm = [](const std::optional<double>& m) { return m ? *m / core::kMetresPerNm : -1.0; };
+        guidance_[QStringLiteral("mode")] = g->mode == boat::nav::NavMode::Mob     ? QStringLiteral("mob")
+                                            : g->mode == boat::nav::NavMode::Route ? QStringLiteral("route")
+                                                                                   : QStringLiteral("goto");
+        guidance_[QStringLiteral("target")] = QString::fromStdString(g->to.name);
+        guidance_[QStringLiteral("routeName")] = QString::fromStdString(g->route_name);
+        guidance_[QStringLiteral("leg")] = static_cast<int>(g->leg);
+        guidance_[QStringLiteral("legs")] = static_cast<int>(g->legs);
+        guidance_[QStringLiteral("dtwNm")] = nm(g->dtw_m);
+        guidance_[QStringLiteral("btw")] = g->btw_deg.value_or(-1.0);
+        guidance_[QStringLiteral("xteNm")] = g->xte_m ? *g->xte_m / core::kMetresPerNm : 0.0;
+        guidance_[QStringLiteral("hasXte")] = g->xte_m.has_value();
+        guidance_[QStringLiteral("ttgMin")] = g->ttg_s ? *g->ttg_s / 60.0 : -1.0;
+        guidance_[QStringLiteral("remainingNm")] = nm(g->route_remaining_m);
+        guidance_[QStringLiteral("arrived")] = g->arrived;
+        guidance_[QStringLiteral("from")] =
+            g->from ? QVariant(QVariantMap{{"lat", g->from->point.lat_deg}, {"lon", g->from->point.lon_deg}}) : QVariant();
+        QVariantList points;
+        for (const auto& p : g->remaining) {
+            points.append(QVariantMap{{"name", QString::fromStdString(p.name)},
+                                      {"lat", p.point.lat_deg},
+                                      {"lon", p.point.lon_deg}});
+        }
+        guidance_[QStringLiteral("points")] = points;
+    }
     emit changed();
 }

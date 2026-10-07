@@ -164,6 +164,22 @@ AlarmList AlarmEvaluator::finish(AlarmList list) {
     return list;
 }
 
+std::vector<Alarm> guidance_alarms(const Guidance& g) {
+    std::vector<Alarm> out;
+    if (g.mode == NavMode::Mob) {
+        std::ostringstream s;
+        s << "MANN ÜBER BORD";
+        if (g.dtw_m && g.btw_deg) {
+            s << ": " << static_cast<int>(std::lround(*g.dtw_m)) << " m, " << static_cast<int>(std::lround(*g.btw_deg))
+              << "°";
+        }
+        out.push_back({AlarmId::Mob, s.str(), 0, AlarmLevel::Alarm});
+    } else if (g.arrived) {
+        out.push_back({AlarmId::Arrival, "Ziel erreicht: " + g.to.name, 0, AlarmLevel::Warning});
+    }
+    return out;
+}
+
 // ---- NavModule --------------------------------------------------------------
 
 NavModule::~NavModule() { stop(); }
@@ -195,6 +211,8 @@ void NavModule::start(core::DataBus& bus) {
         AlarmEvaluator alarms(settings_.alarms);
         std::vector<core::AisReport> reports;
         std::vector<AnchorCommand> commands;
+        std::vector<NavCommand> nav_commands;
+        Navigator navigator(settings_.navigator);
         bool acknowledge = false;
         const auto ais_sub = bus.topic<core::AisReport>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
@@ -203,6 +221,17 @@ void NavModule::start(core::DataBus& bus) {
         const auto anchor_sub = bus.topic<AnchorCommand>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
             commands.push_back(s.value);
+        });
+        const auto nav_sub = bus.topic<NavCommand>().subscribe([&](const auto& s) {
+            NavCommand c = s.value;
+            // MOB: take the position at the moment of the key press, not at the next 1 Hz tick
+            if (c.action == NavCommand::Action::Mob) {
+                if (const auto p = bus.latest<core::Position>(); p && core::is_fresh(*p, std::chrono::seconds(5))) {
+                    c.waypoint = Waypoint{"MOB", p->value.point};
+                }
+            }
+            std::scoped_lock lock(mutex);
+            nav_commands.push_back(std::move(c));
         });
         const auto ack_sub = bus.topic<AlarmAcknowledge>().subscribe([&](const auto&) {
             std::scoped_lock lock(mutex);
@@ -215,22 +244,31 @@ void NavModule::start(core::DataBus& bus) {
                 std::scoped_lock lock(mutex);
                 for (const auto& r : reports) ais.update(r, now);
                 for (const auto& c : commands) alarms.command(c, own);
+                for (const auto& c : nav_commands) {
+                    navigator.command(c, own ? std::optional(own->value.point) : std::nullopt);
+                }
                 if (acknowledge) alarms.acknowledge();
                 reports.clear();
                 commands.clear();
+                nav_commands.clear();
                 acknowledge = false;
             }
             const auto cog = bus.latest<core::CourseOverGround>();
             const auto list = ais.evaluate(own ? std::optional(own->value) : std::nullopt,
                                            cog ? std::optional(cog->value) : std::nullopt, now);
             bus.publish(list);
-            bus.publish(alarms.evaluate(own, bus.latest<core::Depth>(), list, now));
+            const bool own_fresh = own && core::is_fresh(*own, std::chrono::seconds(5), now);
+            const Guidance guidance = navigator.update(own_fresh ? std::optional(own->value.point) : std::nullopt,
+                                                       cog ? std::optional(cog->value) : std::nullopt);
+            bus.publish(guidance);
+            bus.publish(alarms.evaluate(own, bus.latest<core::Depth>(), list, now, guidance_alarms(guidance)));
             bus.publish(alarms.anchor());
             for (int i = 0; running_ && i < 10; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         bus.topic<core::AisReport>().unsubscribe(ais_sub);
         bus.topic<AnchorCommand>().unsubscribe(anchor_sub);
         bus.topic<AlarmAcknowledge>().unsubscribe(ack_sub);
+        bus.topic<NavCommand>().unsubscribe(nav_sub);
     });
 }
 

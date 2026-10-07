@@ -15,7 +15,8 @@ add_executable(boat_tests
     test_nmea2000.cpp
     test_nav.cpp
     test_simulator.cpp
-    test_buzzer.cpp)
+    test_buzzer.cpp
+    test_route.cpp)
 target_link_libraries(boat_tests PRIVATE
     boat::core boat::hal boat::nmea0183 boat::nmea2000 boat::nav boat::sim boat::buzzer GTest::gtest_main)
 boat_set_warnings(boat_tests)

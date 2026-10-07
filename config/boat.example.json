@@ -15,6 +15,8 @@
     "../charts/seamarks.mbtiles"
   ],
   "depth_offset_m": -0.4,
+  "navigation_file": "navigation.gpx",
+  "_autopilot_output_example": { "kind": "udp", "host": "255.255.255.255", "port": 10110 },
   "_buzzer_example": { "chip": "/dev/gpiochip0", "line": 17, "active_low": false, "startup_beep": true },
   "alarms": {
     "shallow_m": 2.0,
