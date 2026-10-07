@@ -73,7 +73,7 @@ def overpass_query(bbox):
 out geom;"""
 
 
-def fetch_overpass(bbox, attempts=4):
+def fetch_overpass(bbox, attempts=6):
     data = urllib.parse.urlencode({"data": overpass_query(bbox)}).encode()
     last = None
     for attempt in range(attempts):
@@ -83,7 +83,7 @@ def fetch_overpass(bbox, attempts=4):
             with urllib.request.urlopen(req, timeout=300) as r:
                 return json.load(r)
         except urllib.error.HTTPError as e:
-            if e.code not in (429, 502, 503, 504):
+            if e.code != 429 and e.code < 500:  # 5xx and rate limits are transient
                 raise
             last = e
         except (urllib.error.URLError, TimeoutError) as e:
