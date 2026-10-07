@@ -35,6 +35,8 @@ void BoatModel::dropAnchor(double radius_m) {
 
 void BoatModel::raiseAnchor() { bus_.publish(boat::nav::AnchorCommand{boat::nav::AnchorCommand::Action::Raise, 0.0}); }
 
+void BoatModel::acknowledgeAlarms() { bus_.publish(boat::nav::AlarmAcknowledge{}); }
+
 void BoatModel::poll() {
     const auto pos = fresh<core::Position>(bus_, 3s);
     position_valid_ = pos && pos->quality != core::FixQuality::None;
@@ -78,12 +80,12 @@ void BoatModel::poll() {
     if (const auto list = fresh<boat::nav::AlarmList>(bus_, 5s)) {
         for (const auto& a : list->active) {
             alarms_.append(QVariantMap{{QStringLiteral("id"), static_cast<int>(a.id)},
-                                       {QStringLiteral("key"), QStringLiteral("%1:%2").arg(static_cast<int>(a.id)).arg(a.subject)},
-                                       {QStringLiteral("text"), QString::fromStdString(a.text)}});
+                                       {QStringLiteral("text"), QString::fromStdString(a.text)},
+                                       {QStringLiteral("acknowledged"), a.acknowledged}});
         }
     } else {
         alarms_.append(QVariantMap{{QStringLiteral("id"), 99},
-                                   {QStringLiteral("key"), QStringLiteral("99:0")},
+                                   {QStringLiteral("acknowledged"), false},
                                    {QStringLiteral("text"), QStringLiteral("Alarmüberwachung ausgefallen")}});
     }
     if (const auto anchor = bus_.latest<boat::nav::AnchorState>()) {

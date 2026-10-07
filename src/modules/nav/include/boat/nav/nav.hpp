@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -65,17 +66,33 @@ private:
 
 // ---- Alarms -----------------------------------------------------------------
 
-enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost };
+enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival };
+
+// Alarm: immediate danger, continuous fast beeping until acknowledged.
+// Warning: degraded information, short double beep every few seconds.
+enum class AlarmLevel : std::uint8_t { Warning, Alarm };
 
 struct Alarm {
     AlarmId id;
     std::string text;
     std::uint32_t subject = 0;  // AIS: MMSI, so each new target alarms on its own
+    AlarmLevel level = AlarmLevel::Alarm;
+    bool acknowledged = false;
 };
 
 struct AlarmList {
     std::vector<Alarm> active;
+    // Highest level among unacknowledged alarms; nullopt = silent
+    std::optional<AlarmLevel> sound;
 };
+
+// UI -> AlarmEvaluator: acknowledges all currently active alarms. An alarm
+// that clears and comes back (or a new AIS target) sounds again.
+struct AlarmAcknowledge {};
+
+// Beep pattern shared by all sound outputs (GPIO buzzer, loudspeaker).
+// t_s: any monotonic time in seconds.
+[[nodiscard]] bool buzzer_on(std::optional<AlarmLevel> level, double t_s);
 
 // Commands from the UI to the anchor watch (published on the bus).
 struct AnchorCommand {
@@ -101,18 +118,24 @@ public:
     explicit AlarmEvaluator(AlarmSettings settings = {}) : settings_(settings) {}
 
     void command(const AnchorCommand& cmd, const std::optional<core::Sample<core::Position>>& own);
+    void acknowledge();
 
     // Missing / stale data is an alarm of its own: an anchor watch that
     // silently stops when the GNSS drops out is worse than none.
     AlarmList evaluate(const std::optional<core::Sample<core::Position>>& own,
                        const std::optional<core::Sample<core::Depth>>& depth, const AisTargetList& ais,
-                       Clock::time_point now);
+                       Clock::time_point now, const std::vector<Alarm>& extra = {});
 
     [[nodiscard]] const AnchorState& anchor() const { return anchor_; }
 
 private:
+    AlarmList finish(AlarmList list);
+
+    using Key = std::pair<AlarmId, std::uint32_t>;
     AlarmSettings settings_;
     AnchorState anchor_;
+    std::set<Key> current_;
+    std::set<Key> acknowledged_;
 };
 
 // ---- Module -----------------------------------------------------------------

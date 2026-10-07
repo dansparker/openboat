@@ -1,5 +1,6 @@
 add_library(boat_hal
     src/can_bus.cpp
+    src/gpio.cpp
     src/serial_port.cpp
     src/socket_can.cpp
     src/tcp_socket.cpp

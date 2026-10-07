@@ -24,6 +24,8 @@ qt_add_qml_module(boat_ui
     URI OpenBoat
     VERSION 1.0
     SOURCES
+        src/alarm_sound.hpp
+        src/alarm_sound.cpp
         src/boat_model.hpp
         src/boat_model.cpp
         src/mbtiles_provider.hpp
@@ -35,6 +37,16 @@ target_include_directories(boat_ui PUBLIC src)
 target_link_libraries(boat_ui PUBLIC boat::core boat::nav Qt6::Quick Qt6::Sql)
 boat_set_warnings(boat_ui)
 
+# Alarm tone on the loudspeaker (optional: Qt Multimedia add-on module)
+find_package(Qt6 6.5 QUIET COMPONENTS Multimedia)
+if(TARGET Qt6::Multimedia)
+    target_link_libraries(boat_ui PUBLIC Qt6::Multimedia)
+    target_compile_definitions(boat_ui PRIVATE BOAT_HAVE_MULTIMEDIA)
+    message(STATUS "OpenBoat: alarm sound on the loudspeaker enabled (Qt Multimedia)")
+else()
+    message(STATUS "OpenBoat: Qt Multimedia not found - alarm sound only via GPIO buzzer")
+endif()
+
 qt_add_executable(openboat src/main.cpp)
 target_compile_definitions(openboat PRIVATE OPENBOAT_VERSION="${PROJECT_VERSION}")
 target_link_libraries(openboat PRIVATE
@@ -42,7 +54,8 @@ target_link_libraries(openboat PRIVATE
     boat_uiplugin
     boat::nmea0183
     boat::nmea2000
-    boat::sim)
+    boat::sim
+    boat::buzzer)
 boat_set_warnings(openboat)
 
 set_target_properties(openboat PROPERTIES

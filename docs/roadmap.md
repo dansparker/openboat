@@ -3,7 +3,7 @@
 Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 
 ## v0.2 – sicher benutzbar
-- **Akustischer Alarm** (GPIO-Summer, Lautsprecher) – derzeit nur optisch
+- ~~Akustischer Alarm~~ ✅ (Lautsprecher über Qt Multimedia, GPIO-Summer über `buzzer` in der Konfiguration)
 - Einstellungsseite: Alarmgrenzen, Ankerradius, Tiefenoffset, Einheiten (kn/km/h, m/ft)
 - Missweisung aus Weltmagnetfeldmodell (WMM, aus OpenEFIS übernehmbar), wenn kein Gerät sie liefert
 - Overzoom (Kacheln der höchsten Stufe vergrößern) und Kursoben-Darstellung (course-up)

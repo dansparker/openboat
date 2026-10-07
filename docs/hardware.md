@@ -15,7 +15,7 @@ Selbstbaus – sie sind im Folgenden mitgedacht.
 | NMEA 0183 | RS-422-Empfänger (isoliert) oder USB-Adapter; 4800 Bd (Standard) / 38400 Bd (AIS) | 0183 ist differentiell – nicht einfach an RS-232 hängen |
 | GNSS | Eigener Empfänger mit Außenantenne (NMEA 2000 oder 0183), 5–10 Hz | Interne Antennen unter Deck sind unbrauchbar |
 | AIS | Empfänger oder Class-B-Transponder mit NMEA-Ausgang | Transponder braucht eigene Antenne/Splitter |
-| Alarm | **Summer über GPIO** (Treiberstufe) zusätzlich zur Anzeige | Wer unter Deck schläft, sieht kein blinkendes Banner |
+| Alarm | **Aktiver Piezo-Summer (12 V, ≥ 85 dB) über NPN-Transistor/MOSFET an einem GPIO** (Standard GPIO17, Konfiguration `buzzer`), Freilaufdiode | Wer unter Deck schläft, sieht kein blinkendes Banner. Der Summer läuft unabhängig von der Anzeige und piept auch, wenn die Alarmüberwachung selbst ausfällt; beim Start kurzer Selbsttest-Piep |
 
 ## Inbetriebnahme NMEA 2000 (SocketCAN)
 

@@ -1,0 +1,5 @@
+add_library(boat_buzzer src/buzzer.cpp)
+add_library(boat::buzzer ALIAS boat_buzzer)
+target_include_directories(boat_buzzer PUBLIC include)
+target_link_libraries(boat_buzzer PUBLIC boat::core boat::hal boat::nav)
+boat_set_warnings(boat_buzzer)

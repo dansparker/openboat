@@ -15,6 +15,7 @@
     "../charts/seamarks.mbtiles"
   ],
   "depth_offset_m": -0.4,
+  "_buzzer_example": { "chip": "/dev/gpiochip0", "line": 17, "active_low": false, "startup_beep": true },
   "alarms": {
     "shallow_m": 2.0,
     "cpa_nm": 0.5,

@@ -108,3 +108,53 @@ TEST(AisTable, AnchoredBoatsDoNotAlarm) {
     const auto list = table.evaluate(fix(kHome, now).value, core::CourseOverGround{0.0, 0.0}, now);
     EXPECT_FALSE(list.targets[0].dangerous);
 }
+
+TEST(AlarmEvaluator, AcknowledgeSilencesUntilAlarmReturns) {
+    nav::AlarmEvaluator e({.shallow_m = 2.0});
+    const auto now = core::Clock::now();
+    const core::Sample<core::Depth> shallow{{1.5, 0.0}, now};
+    const core::Sample<core::Depth> deep{{10.0, 0.0}, now};
+    auto l = e.evaluate(fix(kHome, now), shallow, {}, now);
+    EXPECT_EQ(l.sound, nav::AlarmLevel::Alarm);
+    e.acknowledge();
+    l = e.evaluate(fix(kHome, now), shallow, {}, now);
+    EXPECT_FALSE(l.sound.has_value());
+    ASSERT_EQ(l.active.size(), 1U);
+    EXPECT_TRUE(l.active[0].acknowledged);
+    e.evaluate(fix(kHome, now), deep, {}, now);  // condition clears ...
+    l = e.evaluate(fix(kHome, now), shallow, {}, now);  // ... and returns: sounds again
+    EXPECT_EQ(l.sound, nav::AlarmLevel::Alarm);
+}
+
+TEST(AlarmEvaluator, NewAisTargetSoundsAfterAcknowledge) {
+    nav::AlarmEvaluator e;
+    const auto now = core::Clock::now();
+    nav::AisTargetList ais;
+    nav::AisTarget t;
+    t.dangerous = true;
+    t.data.mmsi = 1;
+    ais.targets.push_back(t);
+    e.evaluate(fix(kHome, now), std::nullopt, ais, now);
+    e.acknowledge();
+    EXPECT_FALSE(e.evaluate(fix(kHome, now), std::nullopt, ais, now).sound);
+    t.data.mmsi = 2;
+    ais.targets.push_back(t);
+    EXPECT_EQ(e.evaluate(fix(kHome, now), std::nullopt, ais, now).sound, nav::AlarmLevel::Alarm);
+}
+
+TEST(AlarmEvaluator, GnssLostIsWarningUnlessAnchorWatchActive) {
+    nav::AlarmEvaluator e;
+    const auto now = core::Clock::now();
+    EXPECT_EQ(e.evaluate(std::nullopt, std::nullopt, {}, now).sound, nav::AlarmLevel::Warning);
+    e.command({nav::AnchorCommand::Action::Drop, 30.0}, fix(kHome, now));
+    EXPECT_EQ(e.evaluate(std::nullopt, std::nullopt, {}, now).sound, nav::AlarmLevel::Alarm);
+}
+
+TEST(Buzzer, Patterns) {
+    EXPECT_FALSE(nav::buzzer_on(std::nullopt, 0.1));
+    EXPECT_TRUE(nav::buzzer_on(nav::AlarmLevel::Alarm, 0.1));
+    EXPECT_FALSE(nav::buzzer_on(nav::AlarmLevel::Alarm, 0.3));
+    EXPECT_TRUE(nav::buzzer_on(nav::AlarmLevel::Warning, 0.1));
+    EXPECT_TRUE(nav::buzzer_on(nav::AlarmLevel::Warning, 0.35));
+    EXPECT_FALSE(nav::buzzer_on(nav::AlarmLevel::Warning, 2.0));
+}

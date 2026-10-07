@@ -1,6 +1,8 @@
+#include "alarm_sound.hpp"
 #include "boat_model.hpp"
 #include "mbtiles_provider.hpp"
 
+#include "boat/buzzer/buzzer.hpp"
 #include "boat/core/data_bus.hpp"
 #include "boat/hal/can_bus.hpp"
 #include "boat/nav/nav.hpp"
@@ -139,10 +141,28 @@ int main(int argc, char* argv[]) {
             qWarning() << "OpenBoat: source not started:" << e.what();
         }
     }
+    // Audible alarm via a GPIO buzzer (Raspberry Pi), independent of the UI
+    if (const QJsonObject b = config.value("buzzer").toObject(); !b.isEmpty() && b.value("enabled").toBool(true)) {
+        boat::buzzer::BuzzerConfig c;
+        c.chip = b.value("chip").toString("/dev/gpiochip0").toStdString();
+        c.line = static_cast<unsigned>(b.value("line").toInt(17));
+        c.active_low = b.value("active_low").toBool(false);
+        c.startup_beep = b.value("startup_beep").toBool(true);
+        try {
+            modules.push_back(std::make_unique<boat::buzzer::BuzzerModule>(boat::buzzer::make_gpio_output(c),
+                                                                           c.startup_beep));
+        } catch (const std::exception& e) {
+            qWarning() << "OpenBoat: GPIO buzzer not available:" << e.what();
+        }
+    }
     for (auto& m : modules) m->start(bus);
 
     // Declared before the engine so it outlives the QML that binds to it
     BoatModel model(bus);
+    AlarmSound sound(bus);
+    if (!AlarmSound::available() && !config.contains("buzzer")) {
+        qWarning() << "OpenBoat: NO AUDIBLE ALARM - built without Qt Multimedia and no GPIO buzzer configured";
+    }
 
     // Charts: first entry is the base map, the rest are overlays (e.g. seamarks)
     QQmlApplicationEngine engine;

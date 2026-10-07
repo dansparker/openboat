@@ -27,7 +27,7 @@ Die Screenshots erzeugt die CI bei jedem Lauf (Artefakt „screenshots“).
 | GPS / Kompass / Log / Echolot / Wind | NMEA 0183 (UDP, TCP, seriell, Logdatei) und NMEA 2000 (SocketCAN, candump) | ✅ v0.1 (ungetestet an Hardware) |
 | Datenleiste | SOG, COG, Steuerkurs, Fahrt durchs Wasser, Tiefe, scheinbarer/wahrer Wind, Wassertemperatur | ✅ v0.1 |
 | AIS | Ziele aus AIVDM (Typ 1/2/3/5/18/19/24) und NMEA 2000 (129038/129039), CPA/TCPA, Kollisionswarnung | ✅ v0.1 |
-| Alarme | Ankerwache, Flachwasser, AIS-Kollision, GNSS-Ausfall, Tiefenausfall; Quittierung | ✅ v0.1 (optisch; akustisch → Roadmap) |
+| Alarme | Ankerwache, Flachwasser, AIS-Kollision, GNSS-Ausfall, Tiefenausfall; Quittierung; **Ton über Lautsprecher und GPIO-Summer** (Alarm: Dauerpiepen, Warnung: Doppelpiep), Summer-Selbsttest beim Start | ✅ v0.2 |
 | Nachtmodus | Rote, abgedunkelte Darstellung | ✅ v0.1 |
 | Simulator | Boot auf dem Attersee mit AIS-Ziel | ✅ v0.1 |
 | Vektorkarten (S-57 / Inland ENC) | Darstellung nach S-52-Grundzügen | 🔜 [Roadmap](docs/roadmap.md) |

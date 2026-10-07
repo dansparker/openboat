@@ -83,5 +83,6 @@ Window {
         anchors.topMargin: 16
         width: Math.min(parent.width - 40, 760)
         alarms: boat.alarms
+        onAcknowledge: boat.acknowledgeAlarms()
     }
 }

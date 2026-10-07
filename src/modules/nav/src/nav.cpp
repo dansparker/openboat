@@ -97,13 +97,26 @@ void AlarmEvaluator::command(const AnchorCommand& cmd, const std::optional<core:
     anchor_.distance_m = 0.0;
 }
 
+bool buzzer_on(std::optional<AlarmLevel> level, double t_s) {
+    if (!level) return false;
+    if (*level == AlarmLevel::Alarm) return std::fmod(t_s, 0.5) < 0.25;  // 2 Hz
+    const double p = std::fmod(t_s, 4.0);  // double beep every 4 s
+    return p < 0.15 || (p >= 0.3 && p < 0.45);
+}
+
+void AlarmEvaluator::acknowledge() { acknowledged_.insert(current_.begin(), current_.end()); }
+
 AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Position>>& own,
                                    const std::optional<core::Sample<core::Depth>>& depth, const AisTargetList& ais,
-                                   Clock::time_point now) {
+                                   Clock::time_point now, const std::vector<Alarm>& extra) {
     AlarmList out;
     const bool gnss_ok = own && seconds(now - own->timestamp) <= settings_.gnss_timeout_s &&
                          own->value.quality != core::FixQuality::None;
-    if (!gnss_ok) out.active.push_back({AlarmId::GnssLost, "GNSS-Position verloren"});
+    if (!gnss_ok) {
+        // Without position the anchor watch is blind: that is an alarm, not a warning
+        out.active.push_back({AlarmId::GnssLost, "GNSS-Position verloren", 0,
+                              anchor_.active ? AlarmLevel::Alarm : AlarmLevel::Warning});
+    }
 
     if (anchor_.active && gnss_ok) {
         anchor_.distance_m = core::distance_m(anchor_.anchor, own->value.point);
@@ -116,7 +129,7 @@ AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Positi
 
     if (depth) {
         if (seconds(now - depth->timestamp) > settings_.depth_timeout_s) {
-            out.active.push_back({AlarmId::DepthLost, "Keine Tiefendaten"});
+            out.active.push_back({AlarmId::DepthLost, "Keine Tiefendaten", 0, AlarmLevel::Warning});
         } else if (settings_.shallow_m && depth->value.depth_m() < *settings_.shallow_m) {
             std::ostringstream s;
             s.precision(1);
@@ -132,7 +145,23 @@ AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Positi
         if (t.tcpa_s) s << " in " << static_cast<int>(*t.tcpa_s / 60.0) << " min";
         out.active.push_back({AlarmId::AisCollision, s.str(), t.data.mmsi});
     }
-    return out;
+    out.active.insert(out.active.end(), extra.begin(), extra.end());
+    return finish(std::move(out));
+}
+
+AlarmList AlarmEvaluator::finish(AlarmList list) {
+    current_.clear();
+    for (auto& a : list.active) {
+        const Key key{a.id, a.subject};
+        current_.insert(key);
+        a.acknowledged = acknowledged_.count(key) > 0;
+        if (!a.acknowledged && (!list.sound || a.level > *list.sound)) list.sound = a.level;
+    }
+    // Forget acknowledgements of alarms that cleared, so they sound again next time
+    for (auto it = acknowledged_.begin(); it != acknowledged_.end();) {
+        it = current_.count(*it) > 0 ? std::next(it) : acknowledged_.erase(it);
+    }
+    return list;
 }
 
 // ---- NavModule --------------------------------------------------------------
@@ -166,6 +195,7 @@ void NavModule::start(core::DataBus& bus) {
         AlarmEvaluator alarms(settings_.alarms);
         std::vector<core::AisReport> reports;
         std::vector<AnchorCommand> commands;
+        bool acknowledge = false;
         const auto ais_sub = bus.topic<core::AisReport>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
             reports.push_back(s.value);
@@ -174,6 +204,10 @@ void NavModule::start(core::DataBus& bus) {
             std::scoped_lock lock(mutex);
             commands.push_back(s.value);
         });
+        const auto ack_sub = bus.topic<AlarmAcknowledge>().subscribe([&](const auto&) {
+            std::scoped_lock lock(mutex);
+            acknowledge = true;
+        });
         while (running_) {
             const auto now = Clock::now();
             const auto own = bus.latest<core::Position>();
@@ -181,8 +215,10 @@ void NavModule::start(core::DataBus& bus) {
                 std::scoped_lock lock(mutex);
                 for (const auto& r : reports) ais.update(r, now);
                 for (const auto& c : commands) alarms.command(c, own);
+                if (acknowledge) alarms.acknowledge();
                 reports.clear();
                 commands.clear();
+                acknowledge = false;
             }
             const auto cog = bus.latest<core::CourseOverGround>();
             const auto list = ais.evaluate(own ? std::optional(own->value) : std::nullopt,
@@ -194,6 +230,7 @@ void NavModule::start(core::DataBus& bus) {
         }
         bus.topic<core::AisReport>().unsubscribe(ais_sub);
         bus.topic<AnchorCommand>().unsubscribe(anchor_sub);
+        bus.topic<AlarmAcknowledge>().unsubscribe(ack_sub);
     });
 }
 
