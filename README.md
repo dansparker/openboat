@@ -40,8 +40,8 @@ Simulator mit Demo-Route (`--demo`), Grundkarte aus OpenStreetMap (`tools/make_b
 | Alarme | Ankerwache, Flachwasser, AIS-Kollision, GNSS-Ausfall, Tiefenausfall; Quittierung; **Ton über Lautsprecher und GPIO-Summer** (Alarm: Dauerpiepen, Warnung: Doppelpiep), Summer-Selbsttest beim Start | ✅ v0.2 |
 | Nachtmodus | Rote, abgedunkelte Darstellung | ✅ v0.1 |
 | Simulator | Boot auf dem Attersee mit AIS-Ziel | ✅ v0.1 |
-| Tiefenlinien | `tools/make_depth.py`: Tiefenlinien, Tiefenzahlen, Sicherheitslinie und Flachwasser-Schattierung aus EMODnet/GEBCO-Rastern oder S-57-Tiefenlinien (über GDAL) | ✅ v0.2 |
-| Kurs oben / Nord oben | Kartendrehung mit Hysterese, Nordpfeil zum Umschalten | ✅ v0.2 |
+| Tiefenlinien | `tools/make_depth.py`: Tiefenlinien, Tiefenzahlen, Flachwasser-Schattierung aus EMODnet/GEBCO-Rastern oder S-57-Tiefenlinien (über GDAL); Sicherheitstiefe in der App einstellbar (dicke Sicherheitslinie, wirkt sofort) | ✅ v0.2 |
+| Kurs oben / Nord oben | Kartendrehung mit Hysterese, Nordpfeil zum Umschalten; Ortsnamen und Tiefenzahlen bleiben aufrecht (abschaltbar) | ✅ v0.2 |
 | Vektorkarten (S-57 / Inland ENC) | vollständige Darstellung nach S-52 | 🔜 [Roadmap](docs/roadmap.md) |
 | Wegpunkte, Routen, Go-To, MOB | Wegpunkt per Langdruck auf die Karte, Routen-Editor, automatischer Wegpunktwechsel, XTE/BTW/DTW/TTG, Ankunftsalarm, MOB-Taste; Speicherung als GPX | ✅ v0.2 |
 | Track | Aufzeichnung mit Sprungfilter (vor Anker keine Punktwolke), Tagesdateien nur durch Anhängen (stromausfallsicher), Zeit aus dem GNSS, GPX-Export, Anzeige auf der Karte, frühere Tage einblendbar | ✅ v0.2 |

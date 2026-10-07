@@ -54,8 +54,10 @@ jobs:
       - name: Base chart for the simulator area (cached; rebuilt when the tool changes)
         uses: actions/cache@v4
         with:
-          path: charts/base.mbtiles
-          key: basemap-attersee-${{ hashFiles('tools/make_basemap.py') }}
+          path: |
+            charts/base.mbtiles
+            charts/base.mbtiles.labels.json
+          key: basemap-attersee-v2-${{ hashFiles('tools/make_basemap.py') }}
       - name: Render base chart from OpenStreetMap if not cached
         run: |
           test -f charts/base.mbtiles || { pip install pillow && python3 tools/make_basemap.py --bbox 13.50,47.84,13.62,47.95 --zooms 11-15 --out charts/base.mbtiles; } || { rm -f charts/base.mbtiles; echo "::warning::base chart not rendered (Overpass unavailable) - screenshots without base map"; }
