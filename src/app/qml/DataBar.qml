@@ -1,30 +1,32 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Configurable data fields at the side of the chart (like the GPSMAP data bar).
+// Data fields at the side of the chart (like the GPSMAP data bar); they share the
+// available height so the panel fits any screen.
 ColumnLayout {
     spacing: 4
 
-    DataField { Layout.fillWidth: true; label: "SOG"; unit: "kn"; valid: boat.cogValid; value: boat.sogKn.toFixed(1) }
-    DataField { Layout.fillWidth: true; label: "COG"; unit: "°"; valid: boat.cogValid && boat.sogKn > 0.5; value: Math.round(boat.cog).toString().padStart(3, "0") }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "SOG"; unit: "kn"; valid: boat.cogValid; value: boat.sogKn.toFixed(1) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "COG"; unit: "°"; valid: boat.cogValid && boat.sogKn > 0.5; value: Math.round(boat.cog).toString().padStart(3, "0") }
     DataField {
         Layout.fillWidth: true
+        Layout.fillHeight: true
         label: boat.headingTrue ? "HDG" : "HDG (mag)"
         unit: "°"
         valid: boat.headingValid
         value: Math.round(boat.heading).toString().padStart(3, "0")
     }
-    DataField { Layout.fillWidth: true; label: "Fahrt (STW)"; unit: "kn"; valid: boat.stwValid; value: boat.stwKn.toFixed(1) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Fahrt (STW)"; unit: "kn"; valid: boat.stwValid; value: boat.stwKn.toFixed(1) }
     DataField {
         Layout.fillWidth: true
+        Layout.fillHeight: true
         label: "Tiefe"
         unit: "m"
         valid: boat.depthValid
         value: boat.depth.toFixed(1)
         color: boat.alarms.some(a => a.id === 1 /* ShallowWater */) ? "#5a0000" : Theme.panel
     }
-    DataField { Layout.fillWidth: true; label: "Wind (scheinbar)"; unit: "kn"; valid: boat.windValid; value: Math.round(boat.awa) + "° " + boat.awsKn.toFixed(0) }
-    DataField { Layout.fillWidth: true; label: "Wind (wahr)"; unit: "kn"; valid: boat.windValid; value: Math.round(boat.twd) + "° " + boat.twsKn.toFixed(0) }
-    DataField { Layout.fillWidth: true; label: "Wassertemp."; unit: "°C"; valid: boat.waterTempValid; value: boat.waterTemp.toFixed(1) }
-    Item { Layout.fillHeight: true }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Wind (scheinbar)"; unit: "kn"; valid: boat.windValid; value: Math.round(boat.awa) + "° " + boat.awsKn.toFixed(0) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Wind (wahr)"; unit: "kn"; valid: boat.windValid; value: Math.round(boat.twd) + "° " + boat.twsKn.toFixed(0) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Wassertemp."; unit: "°C"; valid: boat.waterTempValid; value: boat.waterTemp.toFixed(1) }
 }

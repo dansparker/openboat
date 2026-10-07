@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 
 // One labelled value. Shows dashes when the value is invalid (stale source).
 Rectangle {
@@ -10,6 +11,8 @@ Rectangle {
 
     implicitWidth: 150
     implicitHeight: 72
+    Layout.minimumHeight: 44
+    Layout.preferredHeight: 72
     color: Theme.panel
     border.color: Theme.panelBorder
     radius: 4
@@ -27,7 +30,7 @@ Rectangle {
         anchors.bottomMargin: 4
         text: (field.valid ? field.value : "---") + (field.unit ? " " + field.unit : "")
         color: Theme.text
-        font.pixelSize: 30
+        font.pixelSize: Math.max(18, Math.min(30, field.height * 0.45))
         font.bold: true
         font.family: Theme.mono
     }
