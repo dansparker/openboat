@@ -129,6 +129,8 @@ Window {
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
+                // keep the close button clear of the alarm banner
+                anchors.topMargin: alarmBanner.visible ? alarmBanner.height + 28 : 30
                 onCloseRequested: visible = false
                 onNewRoute: { visible = false; chartView.editPoints = []; chartView.editing = true; }
             }
@@ -138,6 +140,8 @@ Window {
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
+                // keep the close button clear of the alarm banner
+                anchors.topMargin: alarmBanner.visible ? alarmBanner.height + 28 : 30
                 onCloseRequested: visible = false
             }
         }
@@ -218,6 +222,7 @@ Window {
     }
 
     AlarmBanner {
+        id: alarmBanner
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 16

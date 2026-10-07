@@ -70,6 +70,10 @@ void Simulator::start(core::DataBus& bus) {
         while (running_) {
             const double t = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             const SimState s = simulate(t);
+            // A GNSS receiver also delivers UTC
+            bus.publish(core::UtcTime{std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::system_clock::now().time_since_epoch())
+                                          .count()});
             bus.publish(s.position);
             bus.publish(s.cog);
             bus.publish(s.heading);
