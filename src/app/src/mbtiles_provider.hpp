@@ -16,6 +16,7 @@ public:
     struct Info {
         bool valid = false;
         QString name;
+        QString attribution;  // source / licence, shown on the chart
         int min_zoom = 0;
         int max_zoom = 0;
         QString error;

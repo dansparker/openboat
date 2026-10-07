@@ -12,6 +12,7 @@
   ],
   "charts": [
     "../charts/base.mbtiles",
+    "../charts/depth.mbtiles",
     "../charts/seamarks.mbtiles"
   ],
   "depth_offset_m": -0.4,

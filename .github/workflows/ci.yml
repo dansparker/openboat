@@ -59,6 +59,15 @@ jobs:
       - name: Render base chart from OpenStreetMap if not cached
         run: |
           test -f charts/base.mbtiles || { pip install pillow && python3 tools/make_basemap.py --bbox 13.50,47.84,13.62,47.95 --zooms 11-15 --out charts/base.mbtiles; } || { rm -f charts/base.mbtiles; echo "::warning::base chart not rendered (Overpass unavailable) - screenshots without base map"; }
+      - name: Chart tool tests
+        run: pip install numpy pillow && python3 tests/python/test_tools.py
+      - name: SYNTHETIC depth overlay for the screenshots (labelled as such, never shipped)
+        run: |
+          if [ -f charts/base.mbtiles ]; then
+            pip install numpy pillow
+            python3 .github/scripts/synthetic_depth.py charts/base.mbtiles 13.50,47.84,13.62,47.95 synthetic.asc
+            python3 tools/make_depth.py --grid synthetic.asc --zooms 11-15 --safety-depth 3 --name "Tiefen SYNTHETISCH" --attribution "SYNTHETISCHE Tiefen – nicht zur Navigation" --out charts/depth.mbtiles
+          fi
       - name: Seamark overlay for the simulator area (small, cached)
         uses: actions/cache@v4
         with:

@@ -458,7 +458,10 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 4
-        text: chart.layers.length > 0 ? "© OpenStreetMap-Mitwirkende, OpenSeaMap" : "Keine Karte geladen – siehe docs/charts.md"
+        // Source and licence of every loaded chart (licence requirement; also shows
+        // e.g. the resolution of depth data, or that data is synthetic)
+        text: chart.layers.length === 0 ? "Keine Karte geladen – siehe docs/charts.md"
+              : chart.layers.map(l => l.attribution || l.name).filter((v, i, a) => v && a.indexOf(v) === i).join("  ·  ")
         color: Theme.overlayText
         style: Text.Outline
         styleColor: Theme.overlayOutline

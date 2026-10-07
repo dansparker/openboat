@@ -41,6 +41,29 @@ python tools/make_basemap.py --bbox 13.47,47.78,13.62,47.96 --zooms 10-16 --out 
   als Land gezeichnet würde.
 - Die Grundkarte enthält **keine Tiefen**. Tiefenlinien kommen später aus Inland ENC/EMODnet.
 
+## Tiefenlinien
+
+`tools/make_depth.py` erzeugt ein Overlay mit Tiefenlinien, Tiefenzahlen und Schattierung
+(flacher als die Sicherheitstiefe: blau, Sicherheitslinie dick; tiefes Wasser heller):
+
+```bash
+pip install numpy pillow
+# Meer / Mittelmeer: EMODnet-Raster (ESRI-ASCII, „Download per tile“ auf emodnet.ec.europa.eu)
+python tools/make_depth.py --grid E5_2022.asc --bbox 13.5,44.8,14.0,45.2 --zooms 9-14 --safety-depth 3 --attribution "EMODnet Bathymetry, CC BY 4.0" --out charts/depth.mbtiles
+# Binnen: Tiefenlinien/-flächen einer Inland ENC (S-57) über GDAL
+ogr2ogr -f GeoJSON depcnt.json ZELLE.000 DEPCNT
+python tools/make_depth.py --contours depcnt.json --zooms 12-16 --attribution "Inland ENC viadonau" --out charts/depth.mbtiles
+```
+
+In `boat.json` zwischen Grund- und Seezeichenkarte eintragen. Die Rasterauflösung landet in
+der Quellenangabe auf der Karte – **EMODnet (~115 m) und GEBCO (~450 m) sind für Übersicht und
+Sicherheitsschattierung, nicht für enge Hafeneinfahrten.** Für österreichische Seen sind
+frei zugängliche Tiefendaten selten; wo ein Land Tiefenlinien als Shapefile/GeoJSON
+veröffentlicht, funktioniert `--contours` damit genauso.
+
+> Die Tiefenlinien in den Screenshots sind **synthetisch** (CI, aus der Uferlinie errechnet)
+> und auf der Karte so beschriftet.
+
 ## Seezeichen-Overlay herunterladen (Beispiel Attersee)
 
 ```bash

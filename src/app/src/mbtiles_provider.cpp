@@ -62,6 +62,7 @@ MbTilesProvider::Info MbTilesProvider::inspect(const QString& path) {
                 while (meta.next()) {
                     const QString key = meta.value(0).toString();
                     if (key == QLatin1String("name")) info.name = meta.value(1).toString();
+                    if (key == QLatin1String("attribution")) info.attribution = meta.value(1).toString();
                     if (key == QLatin1String("minzoom")) info.min_zoom = meta.value(1).toInt();
                     if (key == QLatin1String("maxzoom")) info.max_zoom = meta.value(1).toInt();
                 }

@@ -201,7 +201,7 @@ int main(int argc, char* argv[]) {
         }
         const QString id = QStringLiteral("chart%1").arg(index++);
         engine.addImageProvider(id, new MbTilesProvider(path));
-        layers.append(QVariantMap{{"provider", id}, {"name", info.name}, {"minZoom", info.min_zoom},
+        layers.append(QVariantMap{{"provider", id}, {"name", info.name}, {"attribution", info.attribution}, {"minZoom", info.min_zoom},
                                   {"maxZoom", info.max_zoom}});
     }
 

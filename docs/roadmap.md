@@ -6,8 +6,9 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 - ~~Akustischer Alarm~~ ✅ (Lautsprecher über Qt Multimedia, GPIO-Summer über `buzzer` in der Konfiguration)
 - ~~Einstellungsseite~~ ✅ inkl. Tiefenoffset (vom Geber / manuell, wirkt sofort)
 - Missweisung aus Weltmagnetfeldmodell (WMM, aus OpenEFIS übernehmbar), wenn kein Gerät sie liefert
-- ~~Overzoom~~ ✅ (mit Warnhinweis, abschaltbar); offen: Kursoben-Darstellung (course-up)
-- ~~Track-Aufzeichnung (GPX)~~ ✅; offen: Logbuch-Ansicht, Tracks früherer Tage anzeigen, NMEA-Mitschnitt für Replay
+- ~~Overzoom~~ ✅ (mit Warnhinweis, abschaltbar), ~~Kursoben-Darstellung~~ ✅
+- Beschriftungen bei Kurs oben aufrecht halten (drehen derzeit mit)
+- ~~Track-Aufzeichnung (GPX)~~ ✅, ~~Tracks früherer Tage~~ ✅; offen: Logbuch-Ansicht, NMEA-Mitschnitt für Replay
 - Raspberry-Pi-Image mit schreibgeschütztem Root-Dateisystem (wie OpenEFIS `image/`)
 
 ## v0.3 – Navigation
@@ -20,7 +21,8 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 ## v0.4 – Vektorkarten
 - S-57 / Inland ENC lesen (GDAL) und in eigenes Kachel- oder Geometrieformat konvertieren
 - Darstellung nach S-52-Grundzügen: Tiefenflächen (DEPARE), Sicherheitskontur, Tonnen, Fahrrinnen
-- Tiefenschattierung aus EMODnet
+- ~~Tiefenlinien/-schattierung aus EMODnet bzw. S-57-Tiefenlinien~~ ✅ (`tools/make_depth.py`)
+- Sicherheitstiefe in der App einstellbar (derzeit beim Erzeugen des Overlays)
 
 ## später
 - NMEA 2000 senden mit Address Claim (ISO 11783-5) – erst mit Tests gegen echte Geräte ([ADR 0002](adr/0002-nmea2000-listen-only.md))
