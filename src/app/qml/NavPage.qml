@@ -11,7 +11,7 @@ Rectangle {
     border.color: Theme.panelBorder
     radius: 6
 
-    function nm(v) { return v < 1 ? (v * 1852).toFixed(0) + " m" : v.toFixed(1) + " sm"; }
+    function nm(v) { return v < 0.5 ? (v * 1852).toFixed(0) + " m" : (v * settings.distanceFactor).toFixed(1) + " " + settings.distanceLabel; }
     function distanceNm(w) {
         if (!boat.positionValid) return "";
         const r = Math.PI / 180;

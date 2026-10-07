@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 
 // Raster chart in Web Mercator (EPSG:3857, XYZ tiles from MBTiles) with
 // own ship, COG/heading vectors, AIS targets and the anchor circle.
@@ -105,6 +106,52 @@ Item {
                 }
             }
         }
+    }
+
+    // ---- Track -----------------------------------------------------------------
+    // GPU-drawn polyline. Points are converted to world pixels only when the
+    // track or the zoom changes; panning just moves the container. Coordinates
+    // are relative to the first point: absolute world pixels at zoom 18 exceed
+    // float precision in the scene graph.
+    Item {
+        id: trackLayer
+        visible: settings.showTrack && trackPath.path.length > 1
+        property real originX: 0
+        property real originY: 0
+        x: originX - chart.centerX + chart.width / 2
+        y: originY - chart.centerY + chart.height / 2
+
+        function rebuild() {
+            const pts = boat.track;
+            if (pts.length === 0) { trackPath.path = []; return; }
+            originX = chart.worldX(pts[0].lon);
+            originY = chart.worldY(pts[0].lat);
+            const out = new Array(pts.length);
+            for (let i = 0; i < pts.length; ++i)
+                out[i] = Qt.point(chart.worldX(pts[i].lon) - originX, chart.worldY(pts[i].lat) - originY);
+            trackPath.path = out;
+        }
+
+        Shape {
+            ShapePath {
+                strokeColor: Theme.track
+                strokeWidth: 3
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                joinStyle: ShapePath.RoundJoin
+                PathPolyline { id: trackPath }
+            }
+        }
+
+        Connections {
+            target: boat
+            function onTrackChanged() { trackLayer.rebuild(); }
+        }
+        Connections {
+            target: chart
+            function onZoomChanged() { trackLayer.rebuild(); }
+        }
+        Component.onCompleted: rebuild()
     }
 
     // ---- Vectors (own ship, AIS, anchor) --------------------------------------
@@ -294,7 +341,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.margins: 8
         readonly property real nm: 100 * chart.metresPerPixel(boat.positionValid ? boat.latitude : 47) / 1852
-        text: "100 px = " + (nm < 0.1 ? (nm * 1852).toFixed(0) + " m" : nm.toFixed(2) + " sm") + "   Z" + chart.zoom
+        text: "100 px = " + (nm < 0.1 ? (nm * 1852).toFixed(0) + " m" : (nm * settings.distanceFactor).toFixed(2) + " " + settings.distanceLabel) + "   Z" + chart.zoom
         color: Theme.overlayText
         style: Text.Outline
         styleColor: Theme.overlayOutline

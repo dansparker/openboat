@@ -6,7 +6,7 @@ import QtQuick.Layouts
 ColumnLayout {
     spacing: 4
 
-    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "SOG"; unit: "kn"; valid: boat.cogValid; value: boat.sogKn.toFixed(1) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "SOG"; unit: settings.speedLabel; valid: boat.cogValid; value: (boat.sogKn * settings.speedFactor).toFixed(1) }
     DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "COG"; unit: "°"; valid: boat.cogValid && boat.sogKn > 0.5; value: Math.round(boat.cog).toString().padStart(3, "0") }
     DataField {
         Layout.fillWidth: true
@@ -16,14 +16,14 @@ ColumnLayout {
         valid: boat.headingValid
         value: Math.round(boat.heading).toString().padStart(3, "0")
     }
-    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Fahrt (STW)"; unit: "kn"; valid: boat.stwValid; value: boat.stwKn.toFixed(1) }
+    DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Fahrt (STW)"; unit: settings.speedLabel; valid: boat.stwValid; value: (boat.stwKn * settings.speedFactor).toFixed(1) }
     DataField {
         Layout.fillWidth: true
         Layout.fillHeight: true
         label: "Tiefe"
-        unit: "m"
+        unit: settings.depthLabel
         valid: boat.depthValid
-        value: boat.depth.toFixed(1)
+        value: (boat.depth * settings.depthFactor).toFixed(1)
         color: boat.alarms.some(a => a.id === 1 /* ShallowWater */) ? "#5a0000" : Theme.panel
     }
     DataField { Layout.fillWidth: true; Layout.fillHeight: true; label: "Wind (scheinbar)"; unit: "kn"; valid: boat.windValid; value: Math.round(boat.awa) + "° " + boat.awsKn.toFixed(0) }

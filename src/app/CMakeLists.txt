@@ -10,6 +10,7 @@ set(BOAT_QML_FILES
     qml/AlarmBanner.qml
     qml/NavStrip.qml
     qml/NavPage.qml
+    qml/SettingsPage.qml
     qml/TouchButton.qml)
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -30,6 +31,8 @@ qt_add_qml_module(boat_ui
         src/alarm_sound.cpp
         src/boat_model.hpp
         src/boat_model.cpp
+        src/settings.hpp
+        src/settings.cpp
         src/route_store.hpp
         src/route_store.cpp
         src/mbtiles_provider.hpp
@@ -38,7 +41,7 @@ qt_add_qml_module(boat_ui
         ${BOAT_QML_FILES})
 
 target_include_directories(boat_ui PUBLIC src)
-target_link_libraries(boat_ui PUBLIC boat::core boat::nav Qt6::Quick Qt6::Sql)
+target_link_libraries(boat_ui PUBLIC boat::core boat::nav boat::track Qt6::Quick Qt6::Sql)
 boat_set_warnings(boat_ui)
 
 # Alarm tone on the loudspeaker (optional: Qt Multimedia add-on module)

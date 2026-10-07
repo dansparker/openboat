@@ -47,6 +47,12 @@ class BoatModel : public QObject {
     //   dtwNm, btw, xteNm, ttgMin, remainingNm, arrived, from: {lat, lon} | null, points: [{name, lat, lon}] }
     // Values are -1 when unknown (no fix).
     Q_PROPERTY(QVariantMap guidance READ guidance NOTIFY changed)
+    // Track: points [{lat, lon}] change only with trackVersion (cheap to watch)
+    Q_PROPERTY(QVariantList track READ track NOTIFY trackChanged)
+    Q_PROPERTY(bool trackRecording READ trackRecording NOTIFY changed)
+    Q_PROPERTY(double trackTodayNm READ trackTodayNm NOTIFY changed)
+    Q_PROPERTY(bool timeFromGnss READ timeFromGnss NOTIFY changed)
+    Q_PROPERTY(QString trackExport READ trackExport NOTIFY changed)
 
 public:
     explicit BoatModel(boat::core::DataBus& bus, QObject* parent = nullptr);
@@ -79,6 +85,11 @@ public:
     double anchorDistance() const { return anchor_distance_; }
     QVariantList aisTargets() const { return ais_; }
     QVariantMap guidance() const { return guidance_; }
+    QVariantList track() const { return track_; }
+    bool trackRecording() const { return track_recording_; }
+    double trackTodayNm() const { return track_today_nm_; }
+    bool timeFromGnss() const { return time_from_gnss_; }
+    QString trackExport() const { return track_export_; }
 
     Q_INVOKABLE void dropAnchor(double radius_m);
     Q_INVOKABLE void raiseAnchor();
@@ -86,6 +97,7 @@ public:
 
 signals:
     void changed();
+    void trackChanged();
 
 private:
     void poll();
@@ -111,4 +123,10 @@ private:
     double anchor_lat_ = 0.0, anchor_lon_ = 0.0, anchor_radius_ = 0.0, anchor_distance_ = 0.0;
     QVariantList ais_;
     QVariantMap guidance_;
+    QVariantList track_;
+    std::uint64_t track_version_ = 0;
+    bool track_recording_ = false;
+    double track_today_nm_ = 0.0;
+    bool time_from_gnss_ = false;
+    QString track_export_;
 };

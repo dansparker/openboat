@@ -7,6 +7,7 @@
 #include "boat/core/marine_data.hpp"
 #include "boat/core/nav_math.hpp"
 #include "boat/nav/nav.hpp"
+#include "boat/track/track.hpp"
 
 using namespace std::chrono_literals;
 namespace core = boat::core;
@@ -142,6 +143,22 @@ void BoatModel::poll() {
                                       {"lon", p.point.lon_deg}});
         }
         guidance_[QStringLiteral("points")] = points;
+    }
+    if (const auto t = bus_.latest<boat::track::TrackState>()) {
+        const auto& s = t->value;
+        track_recording_ = s.recording;
+        track_today_nm_ = s.today_m / core::kMetresPerNm;
+        time_from_gnss_ = s.time_from_gnss;
+        track_export_ = QString::fromStdString(s.last_export);
+        if (s.version != track_version_) {
+            track_version_ = s.version;
+            track_.clear();
+            track_.reserve(static_cast<qsizetype>(s.points.size()));
+            for (const auto& p : s.points) {
+                track_.append(QVariantMap{{QStringLiteral("lat"), p.point.lat_deg}, {QStringLiteral("lon"), p.point.lon_deg}});
+            }
+            emit trackChanged();
+        }
     }
     emit changed();
 }

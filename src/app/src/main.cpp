@@ -2,6 +2,7 @@
 #include "boat_model.hpp"
 #include "mbtiles_provider.hpp"
 #include "route_store.hpp"
+#include "settings.hpp"
 
 #include "boat/buzzer/buzzer.hpp"
 #include "boat/core/data_bus.hpp"
@@ -11,6 +12,7 @@
 #include "boat/nmea0183/source.hpp"
 #include "boat/nmea2000/source.hpp"
 #include "boat/sim/simulator.hpp"
+#include "boat/track/track.hpp"
 
 #include <QCommandLineParser>
 #include <QDebug>
@@ -115,7 +117,9 @@ int main(int argc, char* argv[]) {
                                  QStringLiteral("ms"), QStringLiteral("8000"));
     QCommandLineOption demo_opt(QStringLiteral("demo"),
                                 QStringLiteral("Start a demo route near the simulator (screenshots, trying out)"));
-    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt, demo_opt});
+    QCommandLineOption page_opt(QStringLiteral("page"), QStringLiteral("Open a page at start: routes | settings"),
+                                QStringLiteral("page"));
+    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt, demo_opt, page_opt});
     cli.process(app);
 
     const QString config_path = cli.value(config_opt);
@@ -125,16 +129,15 @@ int main(int argc, char* argv[]) {
     boat::core::DataBus bus;
     std::vector<std::unique_ptr<Module>> modules;
 
-    // Alarm settings
-    boat::nav::NavSettings nav;
-    const QJsonObject alarms = config.value("alarms").toObject();
-    if (alarms.contains("shallow_m")) {
-        const double v = alarms.value("shallow_m").toDouble(-1.0);
-        nav.alarms.shallow_m = v > 0 ? std::optional(v) : std::nullopt;
-    }
-    nav.ais.cpa_alarm_m = alarms.value("cpa_nm").toDouble(0.5) * 1852.0;
-    nav.ais.tcpa_alarm_s = alarms.value("tcpa_min").toDouble(10.0) * 60.0;
-    modules.push_back(std::make_unique<boat::nav::NavModule>(nav));
+    // User settings (settings page) on top of the configuration defaults
+    Settings settings(bus, resolve(base_dir, config.value("settings_file").toString("settings.json")), config);
+    modules.push_back(std::make_unique<boat::nav::NavModule>(settings.navSettings()));
+
+    boat::track::TrackConfig track;
+    track.dir = resolve(base_dir, config.value("track_dir").toString("tracks")).toStdString();
+    track.recording = settings.trackRecording();
+    track.filter.min_distance_m = settings.trackSpacing();
+    modules.push_back(std::make_unique<boat::track::TrackModule>(track));
 
     const double depth_offset = config.value("depth_offset_m").toDouble(0.0);
     for (const auto& value : config.value("sources").toArray()) {
@@ -200,8 +203,10 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("routes"), &routes);
+    engine.rootContext()->setContextProperty(QStringLiteral("settings"), &settings);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
     engine.rootContext()->setContextProperty(QStringLiteral("startNight"), cli.isSet(night_opt));
+    engine.rootContext()->setContextProperty(QStringLiteral("startPage"), cli.value(page_opt));
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
         Qt::QueuedConnection);

@@ -9,7 +9,11 @@ Window {
     visibility: startFullScreen ? Window.FullScreen : Window.Windowed
     title: "OpenBoat"
     color: Theme.background
-    Component.onCompleted: Theme.night = startNight
+    Component.onCompleted: {
+        Theme.night = startNight;
+        navPage.visible = startPage === "routes";
+        settingsPage.visible = startPage === "settings";
+    }
 
     RowLayout {
         anchors.fill: parent
@@ -25,6 +29,7 @@ Window {
                 anchors.fill: parent
                 layers: chartLayers
                 waypoints: routes.waypoints
+                vectorMinutes: settings.vectorMinutes
                 onLongPressed: (lat, lon, x, y) => {
                     if (editing) return;
                     menu.lat = lat;
@@ -127,6 +132,14 @@ Window {
                 onCloseRequested: visible = false
                 onNewRoute: { visible = false; chartView.editPoints = []; chartView.editing = true; }
             }
+
+            SettingsPage {
+                id: settingsPage
+                visible: false
+                anchors.fill: parent
+                anchors.margins: 30
+                onCloseRequested: visible = false
+            }
         }
 
         ColumnLayout {
@@ -176,22 +189,27 @@ Window {
                     onClicked: Theme.night = !Theme.night
                 }
                 TouchButton {
-                    Layout.columnSpan: 2
                     Layout.fillWidth: true
                     fontSize: 16
-                    text: "Wegpunkte & Routen"
+                    text: "Routen"
                     checked: navPage.visible
-                    onClicked: navPage.visible = !navPage.visible
+                    onClicked: { settingsPage.visible = false; navPage.visible = !navPage.visible; }
+                }
+                TouchButton {
+                    Layout.fillWidth: true
+                    fontSize: 16
+                    text: "Setup"
+                    checked: settingsPage.visible
+                    onClicked: { navPage.visible = false; settingsPage.visible = !settingsPage.visible; }
                 }
                 TouchButton {
                     Layout.columnSpan: 2
                     Layout.fillWidth: true
                     fontSize: 16
                     checked: boat.anchorActive
-                    property int watchRadius: 40
                     text: boat.anchorActive ? "Anker auf (halten) " + boat.anchorDistance.toFixed(0) + "/" + boat.anchorRadius.toFixed(0) + " m"
-                                            : "Ankerwache " + watchRadius + " m"
-                    onClicked: if (!boat.anchorActive) boat.dropAnchor(watchRadius)
+                                            : "Ankerwache " + settings.anchorRadius.toFixed(0) + " m"
+                    onClicked: if (!boat.anchorActive) boat.dropAnchor(settings.anchorRadius)
                     // Hold to raise: a single accidental touch must not switch the watch off
                     onHeld: if (boat.anchorActive) boat.raiseAnchor()
                 }

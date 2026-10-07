@@ -13,7 +13,10 @@ Rectangle {
     border.color: g.mode === "mob" ? Theme.danger : Theme.route
     border.width: 2
 
-    function nm(v) { return v === undefined || v < 0 ? "---" : v < 1 ? (v * 1852).toFixed(0) + " m" : v.toFixed(2) + " sm"; }
+    function nm(v) {
+        if (v === undefined || v < 0) return "---";
+        return v < 0.5 ? (v * 1852).toFixed(0) + " m" : (v * settings.distanceFactor).toFixed(2) + " " + settings.distanceLabel;
+    }
     function ttg(min) {
         if (min === undefined || min < 0) return "---";
         if (min < 60) return min.toFixed(0) + " min";

@@ -18,6 +18,7 @@ QtObject {
     readonly property color danger: "#ff2020"
     readonly property color anchor: night ? "#c03030" : "#ff9c00"
     readonly property color route: night ? "#a02060" : "#e000e0"
+    readonly property color track: night ? "#601010" : "#404040"
     readonly property color waypoint: night ? "#802020" : "#202020"
     readonly property string mono: "monospace"
     readonly property real chartDimming: night ? 0.35 : 1.0

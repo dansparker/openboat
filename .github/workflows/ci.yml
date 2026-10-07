@@ -70,8 +70,8 @@ jobs:
       - name: Smoke test + screenshots (simulator, no QML errors)
         run: |
           app=./build/release/src/app/openboat
-          for mode in day night; do
-            flag=""; [ "$mode" = night ] && flag="--night"
+          for mode in day night settings; do
+            flag=""; [ "$mode" = night ] && flag="--night"; [ "$mode" = settings ] && flag="--page settings"
             set +e
             QT_DEBUG_PLUGINS=0 QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json --demo $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
             rc=$?
