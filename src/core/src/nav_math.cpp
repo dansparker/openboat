@@ -22,6 +22,17 @@ void local_en(const GeoPoint& a, const GeoPoint& b, double& east, double& north)
 
 }  // namespace
 
+std::int64_t unix_ms(int year, int month, int day, int hour, int minute, double second) {
+    // days_from_civil (H. Hinnant)
+    year -= month <= 2 ? 1 : 0;
+    const int era = (year >= 0 ? year : year - 399) / 400;
+    const int yoe = year - era * 400;
+    const int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    const int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    const std::int64_t days = static_cast<std::int64_t>(era) * 146097 + doe - 719468;
+    return ((days * 24 + hour) * 60 + minute) * 60000 + static_cast<std::int64_t>(std::llround(second * 1000.0));
+}
+
 double normalize_deg(double deg) {
     double r = std::fmod(deg, 360.0);
     if (r < 0.0) r += 360.0;

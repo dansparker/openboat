@@ -3,6 +3,7 @@
 // Navigation math on the WGS84 sphere approximation (good to ~0.5 % for
 // distances; sufficient for chartplotter display, not for surveying).
 
+#include <cstdint>
 #include <optional>
 
 #include "boat/core/marine_data.hpp"
@@ -12,6 +13,9 @@ namespace boat::core {
 inline constexpr double kEarthRadiusM = 6371008.8;  // mean radius
 inline constexpr double kMetresPerNm = 1852.0;
 inline constexpr double kMpsPerKnot = 1852.0 / 3600.0;
+
+// Milliseconds since 1970-01-01 UTC for a civil date/time (proleptic Gregorian).
+[[nodiscard]] std::int64_t unix_ms(int year, int month, int day, int hour, int minute, double second);
 
 [[nodiscard]] double normalize_deg(double deg);         // -> [0, 360)
 [[nodiscard]] double signed_angle_deg(double deg);      // -> (-180, 180]

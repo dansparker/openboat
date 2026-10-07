@@ -1,0 +1,5 @@
+add_library(boat_track src/track.cpp)
+add_library(boat::track ALIAS boat_track)
+target_include_directories(boat_track PUBLIC include)
+target_link_libraries(boat_track PUBLIC boat::core)
+boat_set_warnings(boat_track)

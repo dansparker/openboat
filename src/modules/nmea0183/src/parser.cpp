@@ -128,6 +128,18 @@ bool Parser::feed(std::string_view raw) {
     if (type == "RMC") {
         // Status A = valid; mode indicator N = not valid (NMEA 2.3+)
         if (field(2) == "A" && field(12) != "N") {
+            // hhmmss.ss + ddmmyy -> UTC (two-digit year: 1980..2079, GNSS era)
+            const auto t = field(1);
+            const auto d = field(9);
+            if (t.size() >= 6 && d.size() == 6) {
+                const auto hh = integer(t.substr(0, 2)), mi = integer(t.substr(2, 2));
+                const auto ss = num(t.substr(4));
+                const auto dd = integer(d.substr(0, 2)), mo = integer(d.substr(2, 2)), yy = integer(d.substr(4, 2));
+                if (hh && mi && ss && dd && mo && yy && *mo >= 1 && *mo <= 12 && *dd >= 1 && *dd <= 31 && *hh < 24) {
+                    const int year = *yy < 80 ? 2000 + *yy : 1900 + *yy;
+                    bus_.publish(core::UtcTime{core::unix_ms(year, *mo, *dd, *hh, *mi, *ss)});
+                }
+            }
             if (const auto p = point(field(3), field(4), field(5), field(6))) {
                 core::Position pos;
                 pos.point = *p;

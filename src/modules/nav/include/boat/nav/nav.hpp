@@ -54,6 +54,7 @@ struct AisSettings {
 class AisTable {
 public:
     explicit AisTable(AisSettings settings = {}) : settings_(settings) {}
+    void set_settings(const AisSettings& s) { settings_ = s; }
 
     void update(const core::AisReport& report, Clock::time_point now);
     // Recomputes range/CPA against own ship and expires old targets.
@@ -117,6 +118,7 @@ struct AlarmSettings {
 class AlarmEvaluator {
 public:
     explicit AlarmEvaluator(AlarmSettings settings = {}) : settings_(settings) {}
+    void set_settings(const AlarmSettings& s) { settings_ = s; }
 
     void command(const AnchorCommand& cmd, const std::optional<core::Sample<core::Position>>& own);
     void acknowledge();
@@ -146,6 +148,9 @@ struct NavSettings {
     AlarmSettings alarms;
     NavigatorSettings navigator;
 };
+
+// Publishing NavSettings on the bus (from the settings page) replaces the
+// running module's settings immediately.
 
 // Alarms raised by waypoint navigation (arrival, MOB).
 [[nodiscard]] std::vector<Alarm> guidance_alarms(const Guidance& g);

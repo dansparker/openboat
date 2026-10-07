@@ -64,6 +64,7 @@ struct NavigatorSettings {
 class Navigator {
 public:
     explicit Navigator(NavigatorSettings settings = {}) : settings_(settings) {}
+    void set_settings(const NavigatorSettings& s) { settings_ = s; }
 
     // `own` may be missing: Go-To and MOB then wait for the next fix.
     void command(const NavCommand& cmd, const std::optional<core::GeoPoint>& own);

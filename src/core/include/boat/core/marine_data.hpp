@@ -15,6 +15,12 @@
 
 namespace boat::core {
 
+// UTC from the GNSS. The Raspberry Pi has no real-time clock: without
+// internet its system time is wrong after boot, so logs use this instead.
+struct UtcTime {
+    std::int64_t unix_ms = 0;
+};
+
 struct GeoPoint {
     double lat_deg = 0.0;  // WGS84, north positive
     double lon_deg = 0.0;  // WGS84, east positive

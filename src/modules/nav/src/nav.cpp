@@ -214,6 +214,7 @@ void NavModule::start(core::DataBus& bus) {
         std::vector<NavCommand> nav_commands;
         Navigator navigator(settings_.navigator);
         bool acknowledge = false;
+        std::optional<NavSettings> new_settings;
         const auto ais_sub = bus.topic<core::AisReport>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
             reports.push_back(s.value);
@@ -233,6 +234,10 @@ void NavModule::start(core::DataBus& bus) {
             std::scoped_lock lock(mutex);
             nav_commands.push_back(std::move(c));
         });
+        const auto settings_sub = bus.topic<NavSettings>().subscribe([&](const auto& s) {
+            std::scoped_lock lock(mutex);
+            new_settings = s.value;
+        });
         const auto ack_sub = bus.topic<AlarmAcknowledge>().subscribe([&](const auto&) {
             std::scoped_lock lock(mutex);
             acknowledge = true;
@@ -244,6 +249,12 @@ void NavModule::start(core::DataBus& bus) {
                 std::scoped_lock lock(mutex);
                 for (const auto& r : reports) ais.update(r, now);
                 for (const auto& c : commands) alarms.command(c, own);
+                if (new_settings) {
+                    ais.set_settings(new_settings->ais);
+                    alarms.set_settings(new_settings->alarms);
+                    navigator.set_settings(new_settings->navigator);
+                    new_settings.reset();
+                }
                 for (const auto& c : nav_commands) {
                     navigator.command(c, own ? std::optional(own->value.point) : std::nullopt);
                 }
@@ -269,6 +280,7 @@ void NavModule::start(core::DataBus& bus) {
         bus.topic<AnchorCommand>().unsubscribe(anchor_sub);
         bus.topic<AlarmAcknowledge>().unsubscribe(ack_sub);
         bus.topic<NavCommand>().unsubscribe(nav_sub);
+        bus.topic<NavSettings>().unsubscribe(settings_sub);
     });
 }
 

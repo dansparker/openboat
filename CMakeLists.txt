@@ -24,6 +24,7 @@ add_subdirectory(src/modules/nmea0183)
 add_subdirectory(src/modules/nmea2000)
 add_subdirectory(src/modules/sim)
 add_subdirectory(src/modules/buzzer)
+add_subdirectory(src/modules/track)
 
 # --- Display application (requires Qt 6) -----------------------------------
 if(BOAT_BUILD_APP)

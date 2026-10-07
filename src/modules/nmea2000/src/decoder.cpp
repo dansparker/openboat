@@ -221,6 +221,15 @@ bool Decoder::decode(const Message& m) {
             bus_.publish(core::WaterTemperature{kelvin - kKelvin});
             return true;
         }
+        case 126992: {  // System time (date: days since 1970, time: 0.0001 s since midnight)
+            const auto days = r.u16(2);
+            const auto time = r.u32(4);
+            // Only GNSS-derived time (source 0 GPS, 1 GLONASS): a display's free-running
+            // crystal clock could be just as wrong as ours
+            if (!days || !time || (r.u8(1) & 0x0F) > 1) return false;
+            bus_.publish(core::UtcTime{static_cast<std::int64_t>(*days) * 86400000 + *time / 10});
+            return true;
+        }
         case 127488: {  // Engine parameters, rapid update
             core::EngineData e;
             e.instance = r.u8(0);
