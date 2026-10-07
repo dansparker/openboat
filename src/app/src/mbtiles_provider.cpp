@@ -1,5 +1,7 @@
 #include "mbtiles_provider.hpp"
 
+#include "depth_style.hpp"
+
 #include <QFileInfo>
 #include <QMutexLocker>
 #include <QSqlDatabase>
@@ -30,10 +32,11 @@ QSqlDatabase open_readonly(const QString& path, const QString& connection) {
 
 }  // namespace
 
-MbTilesProvider::MbTilesProvider(QString path)
+MbTilesProvider::MbTilesProvider(QString path, bool depth_encoded)
     : QQuickImageProvider(QQuickImageProvider::Image),
       path_(std::move(path)),
-      connection_(QStringLiteral("mbtiles-") + QUuid::createUuid().toString(QUuid::WithoutBraces)) {
+      connection_(QStringLiteral("mbtiles-") + QUuid::createUuid().toString(QUuid::WithoutBraces)),
+      depth_encoded_(depth_encoded) {
     open_readonly(path_, connection_);
 }
 
@@ -63,6 +66,9 @@ MbTilesProvider::Info MbTilesProvider::inspect(const QString& path) {
                     const QString key = meta.value(0).toString();
                     if (key == QLatin1String("name")) info.name = meta.value(1).toString();
                     if (key == QLatin1String("attribution")) info.attribution = meta.value(1).toString();
+                    if (key == QLatin1String("encoding")) {
+                        info.depth_encoded = meta.value(1).toString() == QLatin1String("openboat-depth-dm-v1");
+                    }
                     if (key == QLatin1String("minzoom")) info.min_zoom = meta.value(1).toInt();
                     if (key == QLatin1String("maxzoom")) info.max_zoom = meta.value(1).toInt();
                 }
@@ -88,7 +94,15 @@ MbTilesProvider::Info MbTilesProvider::inspect(const QString& path) {
 
 QImage MbTilesProvider::requestImage(const QString& id, QSize* size, const QSize& /*requested_size*/) {
     QImage image = empty_tile();
-    const QStringList parts = id.split(QLatin1Char('/'));
+    // optional query: "z/x/y?s=3.0"
+    const qsizetype q = id.indexOf(QLatin1Char('?'));
+    double safety = 3.0;
+    if (q >= 0) {
+        for (const auto& kv : id.mid(q + 1).split(QLatin1Char('&'))) {
+            if (kv.startsWith(QLatin1String("s="))) safety = kv.mid(2).toDouble();
+        }
+    }
+    const QStringList parts = (q >= 0 ? id.left(q) : id).split(QLatin1Char('/'));
     if (parts.size() == 3) {
         const int z = parts[0].toInt();
         const int x = parts[1].toInt();
@@ -105,7 +119,9 @@ QImage MbTilesProvider::requestImage(const QString& id, QSize* size, const QSize
         query.addBindValue(tms_row);
         if (query.exec() && query.next()) {
             QImage decoded;
-            if (decoded.loadFromData(query.value(0).toByteArray())) image = decoded;
+            if (decoded.loadFromData(query.value(0).toByteArray())) {
+                image = depth_encoded_ ? styleDepthTile(decoded, safety, deepDepthFor(safety)) : decoded;
+            }
         }
     }
     if (size != nullptr) *size = image.size();

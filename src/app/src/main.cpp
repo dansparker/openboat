@@ -96,6 +96,15 @@ std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_di
     throw std::runtime_error("unknown source type: " + type.toStdString());
 }
 
+// Sidecar with chart labels (tools/make_basemap.py, make_depth.py): drawn by the app,
+// upright also in course-up. [{lon, lat, text, kind, z: [zoom levels]}]
+QVariantList load_labels(const QString& path) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    const auto doc = QJsonDocument::fromJson(file.readAll());
+    return doc.object().value("labels").toArray().toVariantList();
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -200,8 +209,9 @@ int main(int argc, char* argv[]) {
             continue;
         }
         const QString id = QStringLiteral("chart%1").arg(index++);
-        engine.addImageProvider(id, new MbTilesProvider(path));
-        layers.append(QVariantMap{{"provider", id}, {"name", info.name}, {"attribution", info.attribution}, {"minZoom", info.min_zoom},
+        engine.addImageProvider(id, new MbTilesProvider(path, info.depth_encoded));
+        layers.append(QVariantMap{{"provider", id}, {"name", info.name}, {"attribution", info.attribution},
+                                  {"depth", info.depth_encoded}, {"labels", load_labels(path + QStringLiteral(".labels.json"))}, {"minZoom", info.min_zoom},
                                   {"maxZoom", info.max_zoom}});
     }
 

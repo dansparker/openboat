@@ -39,6 +39,9 @@ class Settings : public QObject {
     Q_PROPERTY(bool showTrack READ showTrack WRITE setShowTrack NOTIFY changed)
     Q_PROPERTY(bool overzoom READ overzoom WRITE setOverzoom NOTIFY changed)
     Q_PROPERTY(QString orientation READ orientation WRITE setOrientation NOTIFY changed)  // "north" | "course"
+    Q_PROPERTY(bool showLabels READ showLabels WRITE setShowLabels NOTIFY changed)
+    // Safety depth (m) for the depth chart: shallower water blue, heavy safety contour
+    Q_PROPERTY(double safetyDepth READ safetyDepth WRITE setSafetyDepth NOTIFY changed)
 
     // Depth offset: "transducer" (use what the transducer sends) or "manual" (depthOffset
     // replaces it). Metres; < 0: depth below keel, > 0: depth below waterline.
@@ -70,6 +73,8 @@ public:
     bool showTrack() const { return show_track_; }
     bool overzoom() const { return overzoom_; }
     QString orientation() const { return orientation_; }
+    bool showLabels() const { return show_labels_; }
+    double safetyDepth() const { return safety_depth_; }
     QString depthOffsetMode() const { return depth_offset_mode_; }
     double depthOffset() const { return depth_offset_; }
     QString lastError() const { return error_; }
@@ -88,6 +93,8 @@ public:
     void setShowTrack(bool v);
     void setOverzoom(bool v);
     void setOrientation(const QString& v);
+    void setShowLabels(bool v);
+    void setSafetyDepth(double v);
     void setDepthOffsetMode(const QString& v);
     void setDepthOffset(double v);
 
@@ -123,6 +130,8 @@ private:
     bool show_track_ = true;
     bool overzoom_ = true;
     QString orientation_ = QStringLiteral("north");
+    bool show_labels_ = true;
+    double safety_depth_ = 3.0;
     QString depth_offset_mode_ = QStringLiteral("transducer");
     double depth_offset_ = 0.0;
     QString error_;

@@ -18,6 +18,9 @@ Example (Attersee):
     python tools/make_basemap.py --bbox 13.47,47.78,13.62,47.96 --zooms 10-16 --out charts/base.mbtiles
 
 Needs Pillow (`pip install pillow`). Output tiles are 256 px PNG, XYZ scheme.
+Place names are NOT drawn into the tiles: they go to OUT.labels.json (placed
+without overlaps per zoom level) and the app draws them upright - also when
+the chart is rotated (course-up).
 """
 
 import argparse
@@ -47,7 +50,6 @@ WATER = (200, 225, 240)
 SHORE = (90, 90, 90)
 MARINA = (170, 205, 230)
 STRUCTURE = (70, 70, 70)
-TEXT = (40, 40, 40)
 
 SS = 2  # supersampling factor (anti-aliasing)
 
@@ -296,14 +298,6 @@ def render_tile(layer, z, x, y, sea_background):
             if overlaps(b, x0, y0, 256, 4):
                 d.line(px(line), fill=(0, 0, 0), width=3 * SS)
 
-    # Labels: drawn into every tile they touch, at the same world position -> seamless
-    for (wx, wy), name, kind in layer.places:
-        fs = label_size(kind) * SS
-        if not (x0 - 300 < wx < x0 + 556 and y0 - 40 < wy < y0 + 296):
-            continue
-        d.text(((wx - x0) * SS, (wy - y0) * SS), name, fill=TEXT, font=font(fs), anchor="mm",
-               stroke_width=2 * SS, stroke_fill=LAND)
-
     img = img.resize((256, 256), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
@@ -365,7 +359,20 @@ def main():
             print(f"{i}/{len(jobs)}")
     db.commit()
     db.close()
-    print(f"done: {len(jobs)} tiles -> {args.out}")
+
+    # Place names: one entry per name with the zoom levels where it has room
+    merged = {}
+    for z in range(args.zmin, args.zmax + 1):
+        n = 256 * (1 << z)
+        for (wx, wy), name, kind in place_labels(f["place"], z):
+            lon = wx / n * 360 - 180
+            lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * wy / n))))
+            key = (round(lon, 5), round(lat, 5), name, kind)
+            merged.setdefault(key, []).append(z)
+    labels = [{"lon": k[0], "lat": k[1], "text": k[2], "kind": k[3] or "place", "z": v} for k, v in merged.items()]
+    with open(args.out + ".labels.json", "w", encoding="utf-8") as fh:
+        json.dump({"version": 1, "labels": labels}, fh, ensure_ascii=False)
+    print(f"done: {len(jobs)} tiles -> {args.out}, {len(labels)} labels -> {args.out}.labels.json")
 
 
 if __name__ == "__main__":

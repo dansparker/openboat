@@ -152,6 +152,25 @@ Rectangle {
                 }
 
                 Heading { text: "Tiefe" }
+                StepRow {
+                    label: "Sicherheitstiefe (Karte)"
+                    // shown in the selected depth unit, stored in metres
+                    value: settings.safetyDepth * settings.depthFactor
+                    stepSize: settings.depthUnit === "ft" ? 1 : 0.5
+                    minimum: 0.5 * settings.depthFactor
+                    maximum: 100 * settings.depthFactor
+                    decimals: settings.depthUnit === "ft" ? 0 : 1
+                    unit: settings.depthLabel
+                    onChangedTo: v => settings.safetyDepth = v / settings.depthFactor
+                }
+                Text {
+                    width: content.width
+                    wrapMode: Text.WordWrap
+                    color: Theme.label
+                    font.pixelSize: 14
+                    text: "Flacheres Wasser wird blau, die Sicherheitslinie dick gezeichnet. Tipp: Tiefgang + Sicherheitsabstand; "
+                          + "der Flachwasser-Alarm (oben) misst dagegen die echte Tiefe am Echolot."
+                }
                 ChoiceRow {
                     label: "Tiefenoffset"
                     options: [{ value: "transducer", text: "vom Geber" }, { value: "manual", text: "manuell" }]
@@ -189,6 +208,12 @@ Rectangle {
                     options: [{ value: "north", text: "Nord oben" }, { value: "course", text: "Kurs oben" }]
                     current: settings.orientation
                     onChosen: v => settings.orientation = v
+                }
+                ChoiceRow {
+                    label: "Beschriftungen (Orte, Tiefenzahlen)"
+                    options: [{ value: true, text: "Ein" }, { value: false, text: "Aus" }]
+                    current: settings.showLabels
+                    onChosen: v => settings.showLabels = v
                 }
                 ChoiceRow {
                     label: "Overzoom (Karte über ihre Auflösung vergrößern)"

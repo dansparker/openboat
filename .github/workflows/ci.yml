@@ -66,7 +66,7 @@ jobs:
           if [ -f charts/base.mbtiles ]; then
             pip install numpy pillow
             python3 .github/scripts/synthetic_depth.py charts/base.mbtiles 13.50,47.84,13.62,47.95 synthetic.asc
-            python3 tools/make_depth.py --grid synthetic.asc --zooms 11-15 --safety-depth 3 --name "Tiefen SYNTHETISCH" --attribution "SYNTHETISCHE Tiefen – nicht zur Navigation" --out charts/depth.mbtiles
+            python3 tools/make_depth.py --grid synthetic.asc --zooms 11-15 --name "Tiefen SYNTHETISCH" --attribution "SYNTHETISCHE Tiefen â€“ nicht zur Navigation" --out charts/depth.mbtiles
           fi
       - name: Seamark overlay for the simulator area (small, cached)
         uses: actions/cache@v4
@@ -81,7 +81,7 @@ jobs:
           app=./build/release/src/app/openboat
           for mode in day night settings track courseup; do
             rm -f config/settings.json
-            [ "$mode" = courseup ] && echo '{"orientation": "course"}' > config/settings.json
+            [ "$mode" = courseup ] && echo '{"orientation": "course", "safety_depth_m": 10}' > config/settings.json
             flag=""; [ "$mode" = night ] && flag="--night"; [ "$mode" = settings ] && flag="--page settings"
             [ "$mode" = track ] && flag="--zoom 18"
             set +e

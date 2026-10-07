@@ -12,13 +12,14 @@ Sources (one or both):
                           ogr2ogr -f GeoJSON depcnt.json CELL.000 DEPCNT
                           ogr2ogr -f GeoJSON depare.json CELL.000 DEPARE
 
-Shading follows paper/electronic chart conventions: water shallower than the
-safety depth is blue, deep water (>= --deep-depth) lighter, the safety contour
-is drawn heavier.
+Output: an overlay whose tiles carry the DEPTH per pixel (not colours), plus a
+sidecar FILE.labels.json with the depth numbers (placed per zoom level). The app
+colours the tiles for the safety depth set on its settings page (shallower:
+blue, heavy safety contour, deep water lighter) and draws the numbers upright.
 
 Example:
     python tools/make_depth.py --grid emodnet_D6.asc --bbox 13.5,44.8,14.0,45.2 \\
-        --zooms 9-14 --safety-depth 3 --out charts/depth.mbtiles
+        --zooms 9-14 --out charts/depth.mbtiles
 
 Needs numpy and Pillow (`pip install numpy pillow`). The result is only as good
 as the source: EMODnet cells are ~115 m, GEBCO ~450 m - fine for overview and
@@ -36,16 +37,10 @@ from fetch_tiles import open_mbtiles, tile_range
 
 try:
     import numpy as np
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 except ImportError:
     sys.exit("numpy and Pillow are required: pip install numpy pillow")
 
-SS = 2  # supersampling
-SHALLOW = (110, 165, 220, 170)   # 0 .. safety depth
-DEEP = (255, 255, 255, 110)      # >= deep depth (lightens the base map water)
-CONTOUR = (60, 90, 130, 255)
-SAFETY = (20, 40, 90, 255)
-LABEL = (30, 50, 90, 255)
 DEFAULT_LEVELS = [2, 3, 5, 10, 15, 20, 30, 50, 100, 200, 500, 1000]
 
 
@@ -138,13 +133,18 @@ def contour_segments(grid, level):
     return out
 
 
-# ---- projection & rendering ------------------------------------------------------
+# ---- projection ------------------------------------------------------------------
 
 def world(lon, lat, z):
     n = 256 * (1 << z)
     lat = np.clip(lat, -85.0511, 85.0511)
     s = np.sin(np.radians(lat))
     return (np.asarray(lon) + 180) / 360 * n, (0.5 - np.log((1 + s) / (1 - s)) / (4 * math.pi)) * n
+
+
+def lonlat(wx, wy, z):
+    n = 256 * (1 << z)
+    return wx / n * 360 - 180, math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * wy / n))))
 
 
 def sample_grid(grid, lon, lat):
@@ -161,104 +161,130 @@ def sample_grid(grid, lon, lat):
     return np.where(inside, v, np.nan)
 
 
-def font(size):
-    for name in ("DejaVuSans.ttf", "arial.ttf", "Arial.ttf"):
-        try:
-            return ImageFont.truetype(name, size)
-        except OSError:
-            pass
-    return ImageFont.load_default(size=size)
-
-
 def fmt_depth(d):
     return f"{d:g}"
 
 
-class Zoom:
-    """Contours projected to one zoom level, with label positions."""
+# ---- encoding ----------------------------------------------------------------------
+# Tiles carry the depth, not colours: R,G = depth in decimetres (big endian),
+# B = 1 depth surface / 2 contour line from vector data, A = 255 water, 0 none.
+# The app colours them for the safety depth chosen on the settings page.
 
-    def __init__(self, segments_by_level, z, safety):
-        self.levels = []
-        for level, segs in segments_by_level:
-            if not segs:
-                continue
-            a = np.array(segs, dtype=np.float64)
-            x1, y1 = world(a[:, 0], a[:, 1], z)
-            x2, y2 = world(a[:, 2], a[:, 3], z)
-            px = np.stack([x1, y1, x2, y2], axis=1)
-            self.levels.append((level, px, level == safety))
-        # Labels: the same depth repeats every ~300 px along its line; labels of
-        # different depths keep 40 px apart (contours near a steep shore are dense)
-        self.labels = []
-        for level, px, _ in self.levels:
-            mids = (px[:, :2] + px[:, 2:]) / 2
-            same = []
-            for mx, my in mids[:: max(1, len(mids) // 600)]:
-                if any((mx - tx) ** 2 + (my - ty) ** 2 < 300 ** 2 for tx, ty in same):
-                    continue
-                if any((mx - tx) ** 2 + (my - ty) ** 2 < 40 ** 2 for tx, ty, _ in self.labels):
-                    continue
-                same.append((mx, my))
-                self.labels.append((mx, my, fmt_depth(level)))
+ENCODING = "openboat-depth-dm-v1"
 
 
-def render_tile(z, x, y, zoom_data, grid, areas, safety, deep):
-    size = 256 * SS
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+def encode(depth_m, kind):
+    """depth_m: float array (NaN = none); kind: uint8 array (1 surface, 2 line)."""
+    valid = ~np.isnan(depth_m) & (depth_m >= 0) & (kind > 0)
+    dm = np.clip(np.round(np.nan_to_num(depth_m) * 10), 0, 65535).astype(np.uint16)
+    rgba = np.zeros(depth_m.shape + (4,), dtype=np.uint8)
+    rgba[..., 0] = (dm >> 8).astype(np.uint8)
+    rgba[..., 1] = (dm & 0xFF).astype(np.uint8)
+    rgba[..., 2] = kind
+    rgba[..., 3] = 255
+    rgba[~valid] = 0
+    return rgba
+
+
+def decode(rgba):
+    """Inverse of encode (for tests): -> (depth_m with NaN, kind)."""
+    a = np.asarray(rgba)
+    d = (a[..., 0].astype(np.float32) * 256 + a[..., 1]) / 10
+    d[a[..., 3] == 0] = np.nan
+    return d, a[..., 2]
+
+
+def render_tile(z, x, y, grid, areas, lines):
     x0, y0 = x * 256, y * 256
+    n = 256 * (1 << z)
+    depth = np.full((256, 256), np.nan, dtype=np.float32)
+    kind = np.zeros((256, 256), dtype=np.uint8)
 
-    # Shading from the grid (vectorised per pixel)
     if grid is not None:
-        n = 256 * (1 << z)
-        px = (x0 + (np.arange(size) + 0.5) / SS) / n
-        py = (y0 + (np.arange(size) + 0.5) / SS) / n
+        px = (x0 + np.arange(256) + 0.5) / n
+        py = (y0 + np.arange(256) + 0.5) / n
         lon = px * 360 - 180
         lat = np.degrees(np.arctan(np.sinh(math.pi * (1 - 2 * py))))
         lon_g, lat_g = np.meshgrid(lon, lat)
         d = sample_grid(grid, lon_g, lat_g)
-        rgba = np.zeros((size, size, 4), dtype=np.uint8)
-        rgba[(d > 0) & (d < safety)] = SHALLOW
-        rgba[d >= deep] = DEEP
-        img = Image.fromarray(rgba, "RGBA")
-
-    draw = ImageDraw.Draw(img)
+        water = ~np.isnan(d) & (d > 0)
+        depth[water] = d[water]
+        kind[water] = 1
 
     def tp(wx, wy):
-        return ((wx - x0) * SS, (wy - y0) * SS)
+        return [(a - x0, b - y0) for a, b in zip(wx, wy)]
 
-    # Depth areas from S-57 (DEPARE)
-    for drval1, outer, holes in areas:
-        colour = SHALLOW if drval1 < safety else DEEP if drval1 >= deep else None
-        if colour is None:
-            continue
-        ox, oy = world(np.array([p[0] for p in outer]), np.array([p[1] for p in outer]), z)
-        if ox.max() < x0 or ox.min() > x0 + 256 or oy.max() < y0 or oy.min() > y0 + 256:
-            continue
-        draw.polygon([tp(a, b) for a, b in zip(ox, oy)], fill=colour)
-        for h in holes:
-            hx, hy = world(np.array([p[0] for p in h]), np.array([p[1] for p in h]), z)
-            draw.polygon([tp(a, b) for a, b in zip(hx, hy)], fill=(0, 0, 0, 0))
+    # Depth areas (S-57 DEPARE): a stepped depth surface where no grid exists
+    if areas:
+        surf = Image.new("I", (256, 256), -1)
+        draw = ImageDraw.Draw(surf)
+        for drval1, outer, holes in areas:
+            ox, oy = world(np.array([p[0] for p in outer]), np.array([p[1] for p in outer]), z)
+            if ox.max() < x0 or ox.min() > x0 + 256 or oy.max() < y0 or oy.min() > y0 + 256:
+                continue
+            draw.polygon(tp(ox, oy), fill=int(round(max(0.0, drval1) * 10)))
+            for h in holes:
+                hx, hy = world(np.array([p[0] for p in h]), np.array([p[1] for p in h]), z)
+                draw.polygon(tp(hx, hy), fill=-1)
+        s = np.asarray(surf, dtype=np.int32)
+        use = (s >= 0) & (kind == 0)
+        depth[use] = s[use] / 10
+        kind[use] = 1
 
-    # Contour lines
-    for level, px, is_safety in zoom_data.levels:
-        m = ((np.maximum(px[:, 0], px[:, 2]) >= x0 - 2) & (np.minimum(px[:, 0], px[:, 2]) <= x0 + 258) &
-             (np.maximum(px[:, 1], px[:, 3]) >= y0 - 2) & (np.minimum(px[:, 1], px[:, 3]) <= y0 + 258))
-        width = (3 if is_safety else 1) * SS
-        colour = SAFETY if is_safety else CONTOUR
-        for sx1, sy1, sx2, sy2 in px[m]:
-            draw.line([tp(sx1, sy1), tp(sx2, sy2)], fill=colour, width=width)
+    # Contour lines from vector data (S-57 DEPCNT): drawn as line pixels with their depth
+    if lines:
+        img = Image.new("I", (256, 256), -1)
+        draw = ImageDraw.Draw(img)
+        for level, pts in lines:
+            lx, ly = world(np.array([p[0] for p in pts]), np.array([p[1] for p in pts]), z)
+            if lx.max() < x0 - 2 or lx.min() > x0 + 258 or ly.max() < y0 - 2 or ly.min() > y0 + 258:
+                continue
+            draw.line(tp(lx, ly), fill=int(round(level * 10)), width=1)
+        s = np.asarray(img, dtype=np.int32)
+        on = s >= 0
+        depth[on] = s[on] / 10
+        kind[on] = 2
 
-    # Labels (drawn into every tile they touch: seamless across tiles)
-    f = font(11 * SS)
-    for lx, ly, text in zoom_data.labels:
-        if x0 - 30 < lx < x0 + 286 and y0 - 20 < ly < y0 + 276:
-            draw.text(tp(lx, ly), text, fill=LABEL, font=f, anchor="mm", stroke_width=2 * SS,
-                      stroke_fill=(235, 242, 250, 255))
-
-    img = img.resize((256, 256), Image.LANCZOS)
     buf = io.BytesIO()
-    img.save(buf, "PNG", optimize=True)
+    Image.fromarray(encode(depth, kind), "RGBA").save(buf, "PNG", optimize=True)
     return buf.getvalue()
+
+
+# ---- labels ------------------------------------------------------------------------
+
+def place_depth_labels(segments_by_level, z):
+    """Greedy label placement at zoom z: the same depth every ~300 px along its line,
+    labels of different depths at least 40 px apart. -> [(wx, wy, text)]"""
+    placed = []
+    for level, segs in segments_by_level:
+        if not segs:
+            continue
+        a = np.array(segs, dtype=np.float64)
+        x1, y1 = world(a[:, 0], a[:, 1], z)
+        x2, y2 = world(a[:, 2], a[:, 3], z)
+        mids = np.stack([(x1 + x2) / 2, (y1 + y2) / 2], axis=1)
+        same = []
+        for mx, my in mids[:: max(1, len(mids) // 600)]:
+            if any((mx - tx) ** 2 + (my - ty) ** 2 < 300 ** 2 for tx, ty in same):
+                continue
+            if any((mx - tx) ** 2 + (my - ty) ** 2 < 40 ** 2 for tx, ty, _ in placed):
+                continue
+            same.append((mx, my))
+            placed.append((mx, my, fmt_depth(level)))
+    return placed
+
+
+def write_labels(path, per_zoom):
+    """per_zoom: {z: [(lon, lat, text)]} -> sidecar JSON, one entry per label with its zoom levels"""
+    merged = {}
+    for z, labels in per_zoom.items():
+        for lon, lat, text in labels:
+            key = (round(lon, 5), round(lat, 5), text)
+            merged.setdefault(key, []).append(z)
+    out = [{"lon": k[0], "lat": k[1], "text": k[2], "kind": "depth", "z": sorted(v)} for k, v in merged.items()]
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"version": 1, "labels": out}, fh, ensure_ascii=False)
+    return len(out)
 
 
 def main():
@@ -266,11 +292,9 @@ def main():
     p.add_argument("--grid", help="bathymetry grid (ESRI ASCII .asc)")
     p.add_argument("--depth-positive", action="store_true", help="grid values are depths (positive down)")
     p.add_argument("--contours", help="GeoJSON with depth contours / depth areas")
-    p.add_argument("--bbox", help="lon_min,lat_min,lon_max,lat_max (default: grid extent)")
+    p.add_argument("--bbox", help="lon_min,lat_min,lon_max,lat_max (default: data extent)")
     p.add_argument("--zooms", default="9-14")
-    p.add_argument("--levels", help="contour depths in metres, comma separated")
-    p.add_argument("--safety-depth", type=float, default=3.0, help="safety contour / shading limit (m)")
-    p.add_argument("--deep-depth", type=float, default=30.0, help="deep water shading from (m)")
+    p.add_argument("--levels", help="labelled contour depths in metres, comma separated")
     p.add_argument("--name", default="Tiefen")
     p.add_argument("--attribution", default="", help="source and licence of the depth data")
     p.add_argument("--out", required=True)
@@ -288,20 +312,17 @@ def main():
         h, w = grid["depth"].shape
         bbox = (grid["lon0"], grid["lat0"] - (h - 1) * grid["cell"], grid["lon0"] + (w - 1) * grid["cell"], grid["lat0"])
     else:
-        xs = [p[0] for _, pts in lines for p in pts]
-        ys = [p[1] for _, pts in lines for p in pts]
+        xs = [p[0] for _, pts in lines for p in pts] + [p[0] for _, o, _ in areas for p in o]
+        ys = [p[1] for _, pts in lines for p in pts] + [p[1] for _, o, _ in areas for p in o]
         bbox = (min(xs), min(ys), max(xs), max(ys))
 
     levels = sorted({float(v) for v in args.levels.split(",")} if args.levels else set(DEFAULT_LEVELS))
-    levels = sorted(set(levels) | {args.safety_depth})
     segments = []
     for level in levels:
         segs = contour_segments(grid, level) if grid is not None else []
         segs += [(a[0], a[1], b[0], b[1]) for d, pts in lines if d == level for a, b in zip(pts, pts[1:])]
         segments.append((level, segs))
-    # GeoJSON contours at depths not in `levels` are drawn too
-    extra = sorted({d for d, _ in lines} - set(levels))
-    for level in extra:
+    for level in sorted({d for d, _ in lines} - set(levels)):  # vector contours at other depths
         segments.append((level, [(a[0], a[1], b[0], b[1]) for d, pts in lines if d == level for a, b in zip(pts, pts[1:])]))
     print(f"{sum(len(s) for _, s in segments)} contour segments, {len(areas)} depth areas")
 
@@ -309,8 +330,7 @@ def main():
     args.bbox = ",".join(f"{v:.6f}" for v in bbox)
     args.overlay = True
     if grid is not None:
-        res_m = grid["cell"] * 111320
-        args.attribution = (args.attribution + f" · Raster ~{res_m:.0f} m").strip(" ·")
+        args.attribution = (args.attribution + f" · Raster ~{grid['cell'] * 111320:.0f} m").strip(" ·")
     jobs = []
     for z in range(args.zmin, args.zmax + 1):
         x0, x1, y0, y1 = tile_range(*bbox, z)
@@ -319,18 +339,21 @@ def main():
         sys.exit(f"{len(jobs)} tiles exceed --max-tiles {args.max_tiles}")
 
     db = open_mbtiles(args.out, args)
-    zoom_data, current = None, None
+    db.execute("INSERT OR REPLACE INTO metadata VALUES ('encoding', ?)", (ENCODING,))
     for i, (z, x, y) in enumerate(jobs, 1):
-        if z != current:
-            zoom_data, current = Zoom(segments, z, args.safety_depth), z
         db.execute("INSERT OR REPLACE INTO tiles VALUES (?, ?, ?, ?)",
-                   (z, x, (1 << z) - 1 - y, render_tile(z, x, y, zoom_data, grid, areas, args.safety_depth, args.deep_depth)))
+                   (z, x, (1 << z) - 1 - y, render_tile(z, x, y, grid, areas, lines)))
         if i % 200 == 0:
             db.commit()
             print(f"{i}/{len(jobs)}")
     db.commit()
     db.close()
-    print(f"done: {len(jobs)} tiles -> {args.out}")
+
+    per_zoom = {}
+    for z in range(args.zmin, args.zmax + 1):
+        per_zoom[z] = [lonlat(wx, wy, z) + (text,) for wx, wy, text in place_depth_labels(segments, z)]
+    count = write_labels(args.out + ".labels.json", per_zoom)
+    print(f"done: {len(jobs)} tiles -> {args.out}, {count} labels -> {args.out}.labels.json")
 
 
 if __name__ == "__main__":

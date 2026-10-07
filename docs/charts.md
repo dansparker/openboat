@@ -43,13 +43,17 @@ python tools/make_basemap.py --bbox 13.47,47.78,13.62,47.96 --zooms 10-16 --out 
 
 ## Tiefenlinien
 
-`tools/make_depth.py` erzeugt ein Overlay mit Tiefenlinien, Tiefenzahlen und Schattierung
-(flacher als die Sicherheitstiefe: blau, Sicherheitslinie dick; tiefes Wasser heller):
+`tools/make_depth.py` erzeugt ein Tiefen-Overlay. Die Kacheln enthalten die **Tiefe je Pixel**
+(nicht fertige Farben); die App färbt sie für die **Sicherheitstiefe aus Setup** ein (flacher:
+blau, Sicherheitslinie dick, Tiefenlinien bei 2/3/5/10/15/20/30/50/100 … m, tiefes Wasser
+heller) – eine geänderte Sicherheitstiefe wirkt sofort, ohne die Karte neu zu erzeugen.
+Tiefenzahlen (und bei der Grundkarte die Ortsnamen) stehen in `*.labels.json` neben der
+Kartendatei; die App zeichnet sie immer aufrecht, auch bei „Kurs oben“.
 
 ```bash
 pip install numpy pillow
 # Meer / Mittelmeer: EMODnet-Raster (ESRI-ASCII, „Download per tile“ auf emodnet.ec.europa.eu)
-python tools/make_depth.py --grid E5_2022.asc --bbox 13.5,44.8,14.0,45.2 --zooms 9-14 --safety-depth 3 --attribution "EMODnet Bathymetry, CC BY 4.0" --out charts/depth.mbtiles
+python tools/make_depth.py --grid E5_2022.asc --bbox 13.5,44.8,14.0,45.2 --zooms 9-14 --attribution "EMODnet Bathymetry, CC BY 4.0" --out charts/depth.mbtiles
 # Binnen: Tiefenlinien/-flächen einer Inland ENC (S-57) über GDAL
 ogr2ogr -f GeoJSON depcnt.json ZELLE.000 DEPCNT
 python tools/make_depth.py --contours depcnt.json --zooms 12-16 --attribution "Inland ENC viadonau" --out charts/depth.mbtiles

@@ -158,6 +158,7 @@ Item {
                     asynchronous: false  // SQLite connection belongs to the GUI thread
                     cache: true
                     source: "image://" + chartLayer.layerId + "/" + chartLayer.tileZoom + "/" + modelData.wx + "/" + modelData.y
+                            + (chartLayer.info.depth ? "?s=" + settings.safetyDepth.toFixed(1) : "")
                 }
             }
         }
@@ -287,16 +288,16 @@ Item {
             ctx.beginPath();
             ctx.arc(x, y, 7, 0, 2 * Math.PI);
             ctx.stroke();
-            if (label) {
-                ctx.fillStyle = colour;
-                ctx.font = "bold 15px sans-serif";
-                ctx.fillText(label, x + 10, y - 8);
-            }
+            if (label) texts.push({ x: x, y: y, dx: 10, dy: -10, text: label, font: "bold 15px sans-serif", colour: colour, align: "left" });
         }
+
+        // Text drawn by the upright label canvas: [{x, y (unrotated), dx, dy (upright offset), text, font, colour, align}]
+        property var texts: []
 
         onPaint: {
             const ctx = getContext("2d");
             ctx.reset();
+            texts = [];
             const nav = boat.guidance;
             const magenta = String(Theme.route);
 
@@ -328,9 +329,7 @@ Item {
                 ctx.arc(ax, ay, r, 0, 2 * Math.PI);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                ctx.fillStyle = String(Theme.anchor);
-                ctx.font = "bold 22px sans-serif";
-                ctx.fillText("⚓", ax - 9, ay + 8);
+                texts.push({ x: ax, y: ay, dx: 0, dy: 0, text: "⚓", font: "bold 22px sans-serif", colour: String(Theme.anchor), align: "center" });
             }
 
             // AIS targets: triangle + COG vector
@@ -349,10 +348,7 @@ Item {
                 }
                 shipPolygon(ctx, x, y, t.cog, 12);
                 if (t.dangerous) ctx.fill(); else ctx.stroke();
-                if (t.name) {
-                    ctx.font = "14px sans-serif";
-                    ctx.fillText(t.name, x + 14, y + 4);
-                }
+                if (t.name) texts.push({ x: x, y: y, dx: 16, dy: 0, text: t.name, font: "14px sans-serif", colour: colour, align: "left" });
             }
 
             // Man overboard: big marker and a line back to it
@@ -364,10 +360,9 @@ Item {
                 ctx.beginPath();
                 ctx.arc(mx, my, 14, 0, 2 * Math.PI);
                 ctx.fill();
-                ctx.fillStyle = "white";
-                ctx.font = "bold 13px sans-serif";
-                ctx.fillText("MOB", mx - 15, my + 5);
+                texts.push({ x: mx, y: my, dx: 0, dy: 0, text: "MOB", font: "bold 13px sans-serif", colour: "white", align: "center" });
             }
+            labelCanvas.requestPaint();
 
             if (!boat.positionValid) return;
             const ox = chart.screenX(boat.longitude), oy = chart.screenY(boat.latitude);
@@ -399,6 +394,69 @@ Item {
             ctx.strokeStyle = "black";
             ctx.lineWidth = 2;
             ctx.stroke();
+        }
+    }
+
+    // ---- Labels (always upright) ----------------------------------------------
+    // Chart labels come from the *.labels.json sidecars: already placed without
+    // overlaps per zoom level by the chart tools, so only the visible ones are drawn.
+    // Converted to world pixels only when the zoom or the charts change.
+    readonly property var chartLabels: {
+        const out = [];
+        for (const l of layers) {
+            if (!l.labels || zoom < l.minZoom) continue;
+            const ez = Math.min(zoom, l.maxZoom);  // overzoom: the label set of the highest level
+            if (zoom - ez > 6 || (zoom > l.maxZoom && !settings.overzoom)) continue;
+            for (const lab of l.labels) {
+                if (lab.z.indexOf(ez) < 0) continue;
+                out.push({ wx: worldX(lab.lon), wy: worldY(lab.lat), text: lab.text, kind: lab.kind });
+            }
+        }
+        return out;
+    }
+    onChartLabelsChanged: labelCanvas.requestPaint()
+
+    Canvas {
+        id: labelCanvas
+        anchors.fill: parent
+        renderStrategy: Canvas.Cooperative
+
+        // unrotated chart position -> screen (rotated around the view centre)
+        function toScreen(x, y) {
+            const v = chart.rot(x - chart.width / 2, y - chart.height / 2, -chart.upDeg);
+            return { x: chart.width / 2 + v.x, y: chart.height / 2 + v.y };
+        }
+        function draw(ctx, x, y, text, font, colour, halo, align) {
+            ctx.font = font;
+            ctx.textAlign = align;
+            ctx.textBaseline = "middle";
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = halo;
+            ctx.strokeText(text, x, y);
+            ctx.fillStyle = colour;
+            ctx.fillText(text, x, y);
+        }
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.reset();
+            const halo = Theme.night ? "black" : "rgba(244,236,210,0.9)";
+            const place = Theme.night ? "#a03030" : "#282828";
+            const depth = Theme.night ? "#802020" : "#1e325a";
+            const depthHalo = Theme.night ? "black" : "rgba(235,242,250,0.95)";
+            if (settings.showLabels) {
+                for (const l of chart.chartLabels) {
+                    const p = toScreen(l.wx - chart.centerX + chart.width / 2, l.wy - chart.centerY + chart.height / 2);
+                    if (p.x < -100 || p.y < -20 || p.x > width + 100 || p.y > height + 20) continue;
+                    if (l.kind === "depth") draw(ctx, p.x, p.y, l.text, "11px sans-serif", depth, depthHalo, "center");
+                    else draw(ctx, p.x, p.y, l.text, (l.kind === "city" || l.kind === "town") ? "bold 16px sans-serif" : "13px sans-serif",
+                              place, halo, "center");
+                }
+            }
+            for (const t of overlay.texts) {
+                const p = toScreen(t.x, t.y);
+                draw(ctx, p.x + t.dx, p.y + t.dy, t.text, t.font, t.colour, Theme.night ? "black" : "rgba(255,255,255,0.8)", t.align);
+            }
         }
     }
 

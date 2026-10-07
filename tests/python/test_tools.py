@@ -42,6 +42,25 @@ def test_geojson_depth_properties():
     assert make_depth.depth_property({"name": "x"}) is None
 
 
+def test_depth_encoding_round_trip():
+    d = np.array([[0.4, 12.3], [np.nan, 6553.5]], dtype=np.float32)
+    k = np.array([[1, 2], [0, 1]], dtype=np.uint8)
+    back, kind = make_depth.decode(make_depth.encode(d, k))
+    assert abs(back[0, 0] - 0.4) < 1e-4 and abs(back[0, 1] - 12.3) < 1e-4 and abs(back[1, 1] - 6553.5) < 1e-3
+    assert np.isnan(back[1, 0])
+    assert kind[0, 1] == 2
+
+
+def test_labels_sidecar_merges_zoom_levels(tmp="labels-test.json"):
+    n = make_depth.write_labels(tmp, {12: [(13.5, 47.9, "5")], 13: [(13.5, 47.9, "5"), (13.6, 47.9, "10")]})
+    import json
+    data = json.load(open(tmp, encoding="utf-8"))
+    os.remove(tmp)
+    assert n == 2
+    five = [l for l in data["labels"] if l["text"] == "5"][0]
+    assert five["z"] == [12, 13]
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

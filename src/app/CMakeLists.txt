@@ -31,6 +31,8 @@ qt_add_qml_module(boat_ui
         src/alarm_sound.cpp
         src/boat_model.hpp
         src/boat_model.cpp
+        src/depth_style.hpp
+        src/depth_style.cpp
         src/settings.hpp
         src/settings.cpp
         src/route_store.hpp
