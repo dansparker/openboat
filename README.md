@@ -17,6 +17,11 @@ funktional angelehnt an Geräte wie den Garmin GPSMAP 9000xsv. Schwesterprojekt 
 ![OpenBoat – Nachtmodus](docs/screenshots/night.png)
 </details>
 
+<details><summary>Einstellungen</summary>
+
+![OpenBoat – Einstellungen](docs/screenshots/settings.png)
+</details>
+
 Simulator mit Demo-Route (`--demo`), Grundkarte aus OpenStreetMap (`tools/make_basemap.py`) und OpenSeaMap-Seezeichen. Die Screenshots erzeugt die CI bei jedem Lauf (Artefakt „screenshots“).
 
 ## Vorbild und Stand
