@@ -9,6 +9,7 @@ Window {
     visibility: startFullScreen ? Window.FullScreen : Window.Windowed
     title: "OpenBoat"
     color: Theme.background
+    Component.onCompleted: Theme.night = startNight
 
     RowLayout {
         anchors.fill: parent

@@ -50,12 +50,25 @@ jobs:
         run: cmake --preset release -DBOAT_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build --preset release
-      - name: Smoke test (starts with the simulator, no QML errors)
+      - name: Seamark overlay for the simulator area (small, cached)
+        uses: actions/cache@v4
+        with:
+          path: charts/seamarks.mbtiles
+          key: seamarks-attersee-v1
+      - name: Download seamarks if not cached
         run: |
-          set +e
-          timeout 10 xvfb-run -a ./build/release/src/app/openboat --config config/boat.example.json > app.log 2>&1
-          rc=$?
-          set -e
-          cat app.log
-          test $rc -eq 124  # still running after 10 s = did not crash
-          ! grep -E "TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign" app.log
+          test -f charts/seamarks.mbtiles || python3 tools/fetch_tiles.py --url "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" --bbox 13.50,47.84,13.59,47.90 --zooms 14-14 --out charts/seamarks.mbtiles --name "OpenSeaMap seamarks" --attribution "OpenSeaMap, CC BY-SA" --overlay --delay 0.5 || true
+      - name: Smoke test + screenshots (simulator, no QML errors)
+        run: |
+          app=./build/release/src/app/openboat
+          for mode in day night; do
+            flag=""; [ "$mode" = night ] && flag="--night"
+            QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
+            cat app-$mode.log
+            ! grep -E "TypeError|ReferenceError|is not defined|Cannot assign|Unable to assign" app-$mode.log
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshot-*.png

@@ -19,6 +19,8 @@
 #include <QJsonObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
+#include <QTimer>
 #include <QVariantList>
 #include <QtQml/QQmlExtensionPlugin>
 
@@ -101,7 +103,13 @@ int main(int argc, char* argv[]) {
     QCommandLineOption config_opt({"c", "config"}, QStringLiteral("Configuration file"), QStringLiteral("file"),
                                   QStringLiteral("boat.json"));
     QCommandLineOption fullscreen_opt(QStringLiteral("fullscreen"), QStringLiteral("Start in full screen"));
-    cli.addOptions({config_opt, fullscreen_opt});
+    QCommandLineOption night_opt(QStringLiteral("night"), QStringLiteral("Start in night mode"));
+    QCommandLineOption screenshot_opt(QStringLiteral("screenshot"),
+                                      QStringLiteral("Save a screenshot after <ms> and quit (docs, CI)"),
+                                      QStringLiteral("file"));
+    QCommandLineOption delay_opt(QStringLiteral("screenshot-delay"), QStringLiteral("Delay in ms"),
+                                 QStringLiteral("ms"), QStringLiteral("8000"));
+    cli.addOptions({config_opt, fullscreen_opt, night_opt, screenshot_opt, delay_opt});
     cli.process(app);
 
     const QString config_path = cli.value(config_opt);
@@ -154,10 +162,21 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
+    engine.rootContext()->setContextProperty(QStringLiteral("startNight"), cli.isSet(night_opt));
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
         Qt::QueuedConnection);
     engine.loadFromModule("OpenBoat", "Main");
+
+    if (cli.isSet(screenshot_opt)) {
+        QTimer::singleShot(cli.value(delay_opt).toInt(), &app, [&engine, file = cli.value(screenshot_opt)] {
+            auto* window = engine.rootObjects().isEmpty() ? nullptr
+                                                          : qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+            const bool saved = window != nullptr && window->grabWindow().save(file);
+            if (!saved) qWarning() << "OpenBoat: screenshot failed:" << file;
+            QCoreApplication::exit(saved ? 0 : 1);
+        });
+    }
 
     const int rc = QGuiApplication::exec();
     for (auto it = modules.rbegin(); it != modules.rend(); ++it) (*it)->stop();
