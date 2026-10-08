@@ -51,8 +51,7 @@ jobs:
         run: |
           test -f charts/area-seamarks.mbtiles && exit 0
           # only the zoom levels that are photographed
-          zooms=$(echo "${{ inputs.zooms }}" | tr ' ' '
-' | sort -n | sed -n '1p;$p' | paste -sd- -)
+          zooms=$(printf '%s\n' ${{ inputs.zooms }} | sort -n | sed -n '1p;$p' | paste -sd- -)
           python3 tools/fetch_tiles.py --url "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" --bbox "${{ inputs.bbox }}" --zooms "$zooms" --out charts/area-seamarks.mbtiles --name "OpenSeaMap seamarks" --attribution "OpenSeaMap, CC BY-SA" --overlay --delay 0.5 || true
       - name: Screenshots
         run: |
