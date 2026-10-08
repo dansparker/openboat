@@ -184,6 +184,20 @@ private slots:
         QCOMPARE(again.entries().size(), 1);
     }
 
+    void lastPositionIsRemembered() {
+        QTemporaryDir dir;
+        core::DataBus bus;
+        {
+            Settings s(bus, dir.filePath("settings.json"), QJsonObject{});
+            s.rememberPosition(47.6775, 9.087);
+        }
+        Settings again(bus, dir.filePath("settings.json"), QJsonObject{});
+        QCOMPARE(again.lastLat(), 47.6775);
+        QCOMPARE(again.lastLon(), 9.087);
+        again.rememberPosition(47.6776, 9.087);  // 11 m: not worth a write
+        QCOMPARE(again.lastLat(), 47.6775);
+    }
+
     void settingsDepthText() {
         QTemporaryDir dir;
         core::DataBus bus;

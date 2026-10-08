@@ -60,8 +60,6 @@ TestCase {
         mouseMove(chart, 200, 200);
         mousePress(chart, 200, 200);
         holdSpy.wait(3000);
-        console.log("pressAndHold emitted:", holdSpy.count, "points:", chart.editPoints.length,
-                    "interval:", Qt.styleHints.mousePressAndHoldInterval);
         mouseRelease(chart, 200, 200);
         compare(holdSpy.count, 1, "long press recognised");
         compare(chart.editPoints.length, 2, "hold deletes");

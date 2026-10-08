@@ -639,9 +639,6 @@ Item {
             chart.tapped(chart.latAt(p.y), chart.lonAt(p.x));
         }
         onPressAndHold: mouse => {
-            console.log("DEBUG hold moved", moved, "mouse", mouse.x, mouse.y, "editing", chart.editing,
-                        "point", chart.editing ? chart.editPointAt(chart.unrotate(mouse.x, mouse.y).x, chart.unrotate(mouse.x, mouse.y).y) : -2,
-                        "pts", JSON.stringify(chart.editPoints.map(q => [chart.screenX(q.lon), chart.screenY(q.lat)])));
             if (moved) return;
             const p = chart.unrotate(mouse.x, mouse.y);
             if (chart.editing) {
@@ -693,7 +690,19 @@ Item {
         font.pixelSize: 12
     }
 
-    Component.onCompleted: recentre()
+    // Start where the boat was last (without a fix the view would sit at the top edge
+    // of the Mercator world, where taps and routes make no sense)
+    Component.onCompleted: {
+        centerX = worldX(settings.lastLon);
+        centerY = worldY(settings.lastLat);
+        recentre();
+    }
+    Timer {
+        interval: 60000
+        running: true
+        repeat: true
+        onTriggered: if (boat.positionValid) settings.rememberPosition(boat.latitude, boat.longitude)
+    }
 
     // North arrow; tap toggles north-up / course-up
     Rectangle {

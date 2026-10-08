@@ -42,6 +42,9 @@ class Settings : public QObject {
     Q_PROPERTY(bool overzoom READ overzoom WRITE setOverzoom NOTIFY changed)
     Q_PROPERTY(QString orientation READ orientation WRITE setOrientation NOTIFY changed)  // "north" | "course"
     Q_PROPERTY(bool showLabels READ showLabels WRITE setShowLabels NOTIFY changed)
+    // Last known position: the chart starts there (also before the first fix)
+    Q_PROPERTY(double lastLat READ lastLat NOTIFY changed)
+    Q_PROPERTY(double lastLon READ lastLon NOTIFY changed)
     // Safety depth (m) for the depth chart: shallower water blue, heavy safety contour
     Q_PROPERTY(double safetyDepth READ safetyDepth WRITE setSafetyDepth NOTIFY changed)
 
@@ -82,6 +85,10 @@ public:
     bool overzoom() const { return overzoom_; }
     QString orientation() const { return orientation_; }
     bool showLabels() const { return show_labels_; }
+    double lastLat() const { return last_lat_; }
+    double lastLon() const { return last_lon_; }
+    // Saved only after moving more than 100 m (the SD card is not written every minute at anchor)
+    Q_INVOKABLE void rememberPosition(double lat, double lon);
     double safetyDepth() const { return safety_depth_; }
     QString depthOffsetMode() const { return depth_offset_mode_; }
     double depthOffset() const { return depth_offset_; }
@@ -141,6 +148,8 @@ private:
     bool overzoom_ = true;
     QString orientation_ = QStringLiteral("north");
     bool show_labels_ = true;
+    double last_lat_ = 47.87;  // first start: the simulator area
+    double last_lon_ = 13.545;
     double safety_depth_ = 3.0;
     QString depth_offset_mode_ = QStringLiteral("transducer");
     double depth_offset_ = 0.0;
