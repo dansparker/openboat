@@ -48,6 +48,11 @@ void AisTable::update(const core::AisReport& r, Clock::time_point now) {
     d.class_b = d.class_b || r.class_b;
     // Position reports and static reports arrive separately: merge them
     if (r.position) {
+        if (r.station == core::AisStation::Vessel &&
+            (t.trail.empty() || now - t.trail.back().second >= std::chrono::seconds(30))) {
+            t.trail.emplace_back(*r.position, now);
+        }
+        std::erase_if(t.trail, [&](const auto& p) { return now - p.second > std::chrono::minutes(10); });
         d.position = r.position;
         d.cog_deg = r.cog_deg;
         d.sog_mps = r.sog_mps;

@@ -41,6 +41,8 @@ struct AisTarget {
     AisKind kind = AisKind::Vessel;
     // Beacon in test mode (navigational status 15): listed, no alarm
     bool beacon_test = false;
+    // Where it was: one point every 30 s over the last 10 min, oldest first
+    std::vector<std::pair<core::GeoPoint, Clock::time_point>> trail;
     Clock::time_point last_position{};
     std::optional<double> range_m;
     std::optional<double> bearing_deg;

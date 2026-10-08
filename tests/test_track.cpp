@@ -170,3 +170,19 @@ TEST(TrackModule, ListsAndShowsEarlierDays) {
     EXPECT_EQ(history->value.days[0].points.size(), 2U);
     std::filesystem::remove_all(dir);
 }
+
+TEST(TrackLogbook, DaySummary) {
+    const auto t0 = core::unix_ms(2026, 10, 8, 9, 0, 0);
+    std::vector<track::TrackPoint> pts;
+    for (int i = 0; i < 4; ++i) {
+        pts.push_back({t0 + i * 60000, core::destination(kHome, 90.0, i * 100.0), 2.0 + i, 90.0});
+    }
+    // a 2 h stop (moored), then one more point
+    pts.push_back({t0 + 3 * 60000 + 7200000, core::destination(kHome, 90.0, 400.0), 1.0, 90.0});
+    const auto d = track::day_summary("2026-10-08", pts);
+    EXPECT_EQ(d.start_ms, t0);
+    EXPECT_EQ(d.end_ms, pts.back().unix_ms);
+    EXPECT_NEAR(d.length_m, 400.0, 1.0);
+    EXPECT_DOUBLE_EQ(d.max_sog_mps, 5.0);
+    EXPECT_NEAR(d.underway_s, 180.0, 1e-9);  // the stop is not "underway"
+}

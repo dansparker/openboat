@@ -1,4 +1,5 @@
 add_library(boat_core
+    src/daily_log.cpp
     src/data_bus.cpp
     src/nav_math.cpp)
 add_library(boat::core ALIAS boat_core)

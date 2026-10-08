@@ -7,7 +7,11 @@
 //   udp    WLAN multiplexer / Signal K server broadcasting on port 10110
 //   tcp    multiplexer serving NMEA on a TCP port (10110 or 2000)
 //   serial USB GNSS / AIS receiver, RS-422 via USB adapter (4800 or 38400 Bd)
-//   file   recorded log, replayed at `lines_per_second`
+//   file   recorded log, replayed with its original timing when the lines carry
+//          a time tag block (OpenBoat recordings), otherwise at `lines_per_second`
+//
+// With `record_dir` set, every received line is recorded (prefixed with a
+// "\c:<time>*hh\" tag block) while RecordCommand{on = true} is active.
 
 #include <atomic>
 #include <cstdint>
@@ -28,6 +32,7 @@ struct SourceConfig {
     std::string path;           // file
     double lines_per_second = 20.0;  // file
     bool loop = true;                // file
+    std::string record_dir;          // empty: no recording
     ParserOptions parser;
 };
 

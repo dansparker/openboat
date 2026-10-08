@@ -17,7 +17,9 @@ namespace boat::nmea2000 {
 
 class Nmea2000Source final : public core::Module {
 public:
-    Nmea2000Source(std::string name, std::unique_ptr<hal::CanBus> bus, DecoderOptions options = {});
+    // record_dir: raw frames are recorded (candump -L format) while RecordCommand{on} is active
+    Nmea2000Source(std::string name, std::unique_ptr<hal::CanBus> bus, DecoderOptions options = {},
+                   std::string record_dir = {});
     ~Nmea2000Source() override;
 
     [[nodiscard]] std::string_view name() const override { return name_; }
@@ -28,6 +30,7 @@ private:
     std::string name_;
     std::unique_ptr<hal::CanBus> can_;
     DecoderOptions options_;
+    std::string record_dir_;
     std::atomic<bool> running_{false};
     std::thread worker_;
 };

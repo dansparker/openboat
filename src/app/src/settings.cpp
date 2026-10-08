@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "boat/core/daily_log.hpp"
 #include "boat/track/track.hpp"
 
 namespace {
@@ -49,6 +50,7 @@ void Settings::load(const QJsonObject& o) {
     arrival_radius_ = clamp(o.value("arrival_radius_m").toDouble(arrival_radius_), 10.0, 1000.0);
     vector_minutes_ = clamp(o.value("vector_minutes").toDouble(vector_minutes_), 0.0, 60.0);
     track_recording_ = o.value("track_recording").toBool(track_recording_);
+    record_raw_ = o.value("record_raw").toBool(record_raw_);
     track_spacing_ = clamp(o.value("track_spacing_m").toDouble(track_spacing_), 2.0, 500.0);
     show_track_ = o.value("show_track").toBool(show_track_);
     overzoom_ = o.value("overzoom").toBool(overzoom_);
@@ -73,7 +75,7 @@ void Settings::commit(bool nav, bool track) {
                         {"distance_unit", distance_unit_}, {"shallow_m", shallow_},
                         {"cpa_nm", cpa_nm_},               {"tcpa_min", tcpa_min_},
                         {"anchor_radius_m", anchor_radius_}, {"arrival_radius_m", arrival_radius_},
-                        {"vector_minutes", vector_minutes_}, {"track_recording", track_recording_},
+                        {"vector_minutes", vector_minutes_}, {"track_recording", track_recording_}, {"record_raw", record_raw_},
                         {"track_spacing_m", track_spacing_}, {"show_track", show_track_},
                         {"overzoom", overzoom_},           {"orientation", orientation_},
                         {"show_labels", show_labels_},     {"safety_depth_m", safety_depth_},           {"depth_offset_mode", depth_offset_mode_},
@@ -139,6 +141,11 @@ void Settings::setTrackRecording(bool v) {
     track_recording_ = v;
     commit(false, true);
 }
+void Settings::setRecordRaw(bool v) {
+    record_raw_ = v;
+    commit(false, false);
+    publishRecording();
+}
 void Settings::setTrackSpacing(double v) {
     track_spacing_ = clamp(v, 2.0, 500.0);
     commit(false, true);
@@ -176,6 +183,8 @@ void Settings::setDepthOffset(double v) {
     commit(false, false);
     publishDepthOffset();
 }
+
+void Settings::publishRecording() { bus_.publish(boat::core::RecordCommand{record_raw_}); }
 
 void Settings::publishDepthOffset() {
     bus_.publish(boat::core::DepthOffset{depth_offset_mode_ == QLatin1String("manual") ? std::optional(depth_offset_)

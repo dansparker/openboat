@@ -8,6 +8,7 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(boat_tests
+    test_daily_log.cpp
     test_data_bus.cpp
     test_nav_math.cpp
     test_nmea0183.cpp

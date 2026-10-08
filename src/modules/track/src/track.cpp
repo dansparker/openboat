@@ -146,6 +146,28 @@ bool is_date(const std::string& s) {
            std::all_of(s.begin(), s.end(), [](char c) { return (c >= '0' && c <= '9') || c == '-'; });
 }
 
+}  // namespace
+
+DayInfo day_summary(const std::string& date, const std::vector<TrackPoint>& points) {
+    DayInfo d;
+    d.date = date;
+    d.points = points.size();
+    d.length_m = track_length_m(points);
+    if (points.empty()) return d;
+    d.start_ms = points.front().unix_ms;
+    d.end_ms = points.back().unix_ms;
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        // the recorded SOG, not distance/time: a GNSS jump would give absurd speeds
+        d.max_sog_mps = std::max(d.max_sog_mps, points[i].sog_mps);
+        if (i == 0) continue;
+        const double dt = static_cast<double>(points[i].unix_ms - points[i - 1].unix_ms) / 1000.0;
+        if (dt > 0.0 && dt <= 600.0) d.underway_s += dt;
+    }
+    return d;
+}
+
+namespace {
+
 // All recorded days except `today` (whose numbers come from memory), newest first
 std::vector<DayInfo> scan_days(const std::filesystem::path& dir, const std::string& today) {
     std::vector<DayInfo> out;
@@ -154,7 +176,7 @@ std::vector<DayInfo> scan_days(const std::filesystem::path& dir, const std::stri
         const auto stem = e.path().stem().string();
         if (e.path().extension() != ".csv" || !is_date(stem) || stem == today) continue;
         const auto pts = read_day(dir, stem);
-        if (!pts.empty()) out.push_back({stem, track_length_m(pts), pts.size()});
+        if (!pts.empty()) out.push_back(day_summary(stem, pts));
     }
     std::sort(out.begin(), out.end(), [](const DayInfo& a, const DayInfo& b) { return a.date > b.date; });
     return out;
@@ -184,7 +206,11 @@ void TrackModule::run(core::DataBus& bus) {
     std::vector<DayInfo> earlier_days;   // scanned when the day changes
     const auto update_days = [&] {
         state.days.clear();
-        if (!day_points.empty()) state.days.push_back({day, state.today_m, day_points.size(), true});
+        if (!day_points.empty()) {
+            DayInfo today = day_summary(day, day_points);
+            today.today = true;
+            state.days.push_back(today);
+        }
         state.days.insert(state.days.end(), earlier_days.begin(), earlier_days.end());
     };
     bool dirty = true;

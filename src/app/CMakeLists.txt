@@ -11,6 +11,7 @@ set(BOAT_QML_FILES
     qml/NavStrip.qml
     qml/NavPage.qml
     qml/AisPage.qml
+    qml/LogbookPage.qml
     qml/SettingsPage.qml
     qml/TouchButton.qml)
 
@@ -36,6 +37,8 @@ qt_add_qml_module(boat_ui
         src/depth_style.cpp
         src/depth_chart.hpp
         src/depth_chart.cpp
+        src/logbook.hpp
+        src/logbook.cpp
         src/settings.hpp
         src/settings.cpp
         src/route_store.hpp

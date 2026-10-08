@@ -7,6 +7,7 @@ Rectangle {
     signal closeRequested()
     signal newRoute()
     signal editRoute(int index)
+    signal openLogbook()
 
     color: Theme.panel
     border.color: Theme.panelBorder
@@ -29,6 +30,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             Text { text: "Wegpunkte & Routen"; color: Theme.text; font.pixelSize: 22; font.bold: true; Layout.fillWidth: true }
+            TouchButton { text: "Logbuch"; fontSize: 15; implicitHeight: 46; onClicked: page.openLogbook() }
             TouchButton { text: "Neue Route"; fontSize: 15; implicitHeight: 46; onClicked: page.newRoute() }
             TouchButton { text: "USB"; fontSize: 15; implicitHeight: 46; checked: usbBox.visible; onClicked: { usbBox.visible = !usbBox.visible; if (usbBox.visible) routes.refreshUsb(); } }
             TouchButton { text: "✕"; implicitHeight: 46; onClicked: page.closeRequested() }

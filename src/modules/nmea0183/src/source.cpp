@@ -1,8 +1,13 @@
 #include "boat/nmea0183/source.hpp"
 
+#include "boat/core/daily_log.hpp"
+#include "boat/core/marine_data.hpp"
+
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
+#include <optional>
 #include <cstddef>
 #include <exception>
 #include <fstream>
@@ -35,9 +40,27 @@ void Nmea0183Source::run(core::DataBus& bus) {
     Parser parser(bus, config_.parser);
     LineAssembler lines;
     std::array<std::byte, 2048> buffer{};
+
+    // Recording: switched by RecordCommand on the bus
+    std::atomic<bool> record{false};
+    std::optional<core::DailyLog> log;
+    if (!config_.record_dir.empty() && config_.kind != SourceConfig::Kind::File) {
+        log.emplace(config_.record_dir, "nmea0183-" + name_, "nmea");
+        if (const auto c = bus.latest<core::RecordCommand>()) record = c->value.on;
+    }
+    const auto record_sub = bus.topic<core::RecordCommand>().subscribe([&](const auto& s) { record = s.value.on; });
+    const auto on_line = [&](std::string_view l) {
+        if (log && record) {
+            std::int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch()).count();
+            if (const auto t = bus.latest<core::UtcTime>(); t && core::is_fresh(*t, 10s)) ms = t->value.unix_ms;
+            // lines that already carry a tag block keep it (the multiplexer's own)
+            log->write(l.starts_with('\\') ? std::string(l) : core::nmea_time_tag(ms) + std::string(l), ms);
+        }
+        parser.feed(l);
+    };
     const auto feed = [&](std::size_t n) {
-        lines.push(std::string_view(reinterpret_cast<const char*>(buffer.data()), n),
-                   [&](std::string_view l) { parser.feed(l); });
+        lines.push(std::string_view(reinterpret_cast<const char*>(buffer.data()), n), on_line);
     };
     const auto sleep_while_running = [this](std::chrono::milliseconds d) {
         for (auto t = 0ms; running_ && t < d; t += 100ms) std::this_thread::sleep_for(100ms);
@@ -54,7 +77,7 @@ void Nmea0183Source::run(core::DataBus& bus) {
                     while (running_) {
                         if (const auto d = socket.receive_from(buffer, 200ms)) {
                             feed(d->size);
-                            lines.push("\n", [&](std::string_view l) { parser.feed(l); });  // datagram ends a line
+                            lines.push("\n", on_line);  // datagram ends a line
                         }
                     }
                     break;
@@ -81,9 +104,18 @@ void Nmea0183Source::run(core::DataBus& bus) {
                     if (!in) throw std::runtime_error("cannot open " + config_.path);
                     const auto period = std::chrono::duration<double>(1.0 / std::max(0.1, config_.lines_per_second));
                     std::string line;
+                    std::int64_t last_ms = -1;
                     while (running_ && std::getline(in, line)) {
+                        if (!line.empty() && line.back() == '\r') line.pop_back();
+                        // Recorded with time tags: original timing (gaps capped at 5 s)
+                        const std::int64_t ms = core::nmea_tag_time_ms(line);
+                        if (ms > 0 && last_ms > 0 && ms > last_ms) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(std::min<std::int64_t>(ms - last_ms, 5000)));
+                        } else if (ms <= 0) {
+                            std::this_thread::sleep_for(period);
+                        }
+                        if (ms > 0) last_ms = ms;
                         parser.feed(line);
-                        std::this_thread::sleep_for(period);
                     }
                     if (!config_.loop) {
                         running_ = false;
@@ -97,6 +129,7 @@ void Nmea0183Source::run(core::DataBus& bus) {
             sleep_while_running(2s);
         }
     }
+    bus.topic<core::RecordCommand>().unsubscribe(record_sub);
 }
 
 }  // namespace boat::nmea0183

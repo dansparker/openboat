@@ -71,7 +71,15 @@ struct DayInfo {
     double length_m = 0.0;
     std::size_t points = 0;
     bool today = false;  // the day currently being recorded
+    // Logbook figures
+    std::int64_t start_ms = 0;  // first / last recorded point
+    std::int64_t end_ms = 0;
+    double max_sog_mps = 0.0;
+    double underway_s = 0.0;  // time moving (gaps over 10 min = stopped, not counted)
 };
+
+// Logbook figures of one day's points
+[[nodiscard]] DayInfo day_summary(const std::string& date, const std::vector<TrackPoint>& points);
 
 // Tracks of earlier days selected for display (thinned out for drawing)
 struct TrackHistory {

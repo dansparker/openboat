@@ -252,3 +252,20 @@ TEST(AisTable, SafetyMessagesAlarmUnlessTest) {
     // after an hour the messages are gone
     EXPECT_TRUE(table.evaluate(fix(kHome, now).value, std::nullopt, now + 2h).messages.empty());
 }
+
+TEST(AisTable, TrailKeepsTenMinutes) {
+    nav::AisTable table;
+    const auto t0 = core::Clock::now();
+    core::AisReport r;
+    r.mmsi = 211234560;
+    for (int i = 0; i <= 40; ++i) {  // a report every 20 s for 13 min 20 s
+        r.position = core::destination(kHome, 0.0, i * 50.0);
+        table.update(r, t0 + std::chrono::seconds(20 * i));
+    }
+    const auto list = table.evaluate(fix(kHome, t0).value, std::nullopt, t0 + 800s);
+    ASSERT_EQ(list.targets.size(), 1U);
+    const auto& trail = list.targets[0].trail;
+    EXPECT_GE(trail.size(), 15U);  // ~ one per 30 s (every second report at 20 s spacing)
+    EXPECT_LE(trail.size(), 21U);
+    EXPECT_LE(t0 + 800s - trail.front().second, std::chrono::minutes(10));
+}

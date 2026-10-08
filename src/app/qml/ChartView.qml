@@ -418,6 +418,18 @@ Item {
                     texts.push({ x: x, y: y, dx: 12, dy: 0, text: label, font: "12px sans-serif", colour: c, align: "left" });
                     continue;
                 }
+                // Where the target has been (last 10 min): dotted
+                if (t.trail && t.trail.length > 0 && !t.lost) {
+                    ctx.strokeStyle = t.dangerous ? String(Theme.danger) : String(Theme.ais);
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([2, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(chart.screenX(t.trail[0].lon), chart.screenY(t.trail[0].lat));
+                    for (let k = 1; k < t.trail.length; ++k) ctx.lineTo(chart.screenX(t.trail[k].lon), chart.screenY(t.trail[k].lat));
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
                 if (t.kind !== "vessel") {
                     // Emergency beacon (S-52 style): red circle with a cross
                     const c = t.beaconTest ? String(Theme.aisLost) : String(Theme.danger);

@@ -171,6 +171,9 @@ void BoatModel::poll() {
             m[QStringLiteral("virtualAton")] = t.data.virtual_aton;
             m[QStringLiteral("offPosition")] = t.data.off_position;
             m[QStringLiteral("beaconTest")] = t.beacon_test;
+            QVariantList trail;
+            for (const auto& [p, when] : t.trail) trail.append(QVariantMap{{QStringLiteral("lat"), p.lat_deg}, {QStringLiteral("lon"), p.lon_deg}});
+            m[QStringLiteral("trail")] = trail;
             m[QStringLiteral("lost")] = t.lost;
             m[QStringLiteral("classB")] = t.data.class_b;
             ais_.append(m);
@@ -229,7 +232,11 @@ void BoatModel::poll() {
                 track_days_.append(QVariantMap{{QStringLiteral("date"), date},
                                                {QStringLiteral("lengthNm"), d.length_m / core::kMetresPerNm},
                                                {QStringLiteral("shown"), shown_days_.contains(date)},
-                                               {QStringLiteral("today"), d.today}});
+                                               {QStringLiteral("today"), d.today},
+                                               {QStringLiteral("startMs"), static_cast<double>(d.start_ms)},
+                                               {QStringLiteral("endMs"), static_cast<double>(d.end_ms)},
+                                               {QStringLiteral("maxKn"), d.max_sog_mps * kKnPerMps},
+                                               {QStringLiteral("underwayH"), d.underway_s / 3600.0}});
             }
             track_.clear();
             track_.reserve(static_cast<qsizetype>(s.points.size()));

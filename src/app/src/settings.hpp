@@ -35,6 +35,8 @@ class Settings : public QObject {
     // Chart / track
     Q_PROPERTY(double vectorMinutes READ vectorMinutes WRITE setVectorMinutes NOTIFY changed)
     Q_PROPERTY(bool trackRecording READ trackRecording WRITE setTrackRecording NOTIFY changed)
+    // Raw NMEA 0183 / 2000 recording for replay (config "record_dir")
+    Q_PROPERTY(bool recordRaw READ recordRaw WRITE setRecordRaw NOTIFY changed)
     Q_PROPERTY(double trackSpacing READ trackSpacing WRITE setTrackSpacing NOTIFY changed)
     Q_PROPERTY(bool showTrack READ showTrack WRITE setShowTrack NOTIFY changed)
     Q_PROPERTY(bool overzoom READ overzoom WRITE setOverzoom NOTIFY changed)
@@ -73,6 +75,8 @@ public:
     double arrivalRadius() const { return arrival_radius_; }
     double vectorMinutes() const { return vector_minutes_; }
     bool trackRecording() const { return track_recording_; }
+    bool recordRaw() const { return record_raw_; }
+    void setRecordRaw(bool v);
     double trackSpacing() const { return track_spacing_; }
     bool showTrack() const { return show_track_; }
     bool overzoom() const { return overzoom_; }
@@ -104,6 +108,7 @@ public:
 
     // Publishes the depth offset (call once after the modules started)
     void publishDepthOffset();
+    void publishRecording();
 
     // Values for the core modules at start-up
     [[nodiscard]] boat::nav::NavSettings navSettings() const;
@@ -130,6 +135,7 @@ private:
     double arrival_radius_ = 0.05 * 1852.0;
     double vector_minutes_ = 6.0;
     bool track_recording_ = true;
+    bool record_raw_ = false;
     double track_spacing_ = 10.0;
     bool show_track_ = true;
     bool overzoom_ = true;

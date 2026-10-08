@@ -1,5 +1,6 @@
 #include "alarm_sound.hpp"
 #include "boat_model.hpp"
+#include "logbook.hpp"
 #include "mbtiles_provider.hpp"
 #include "route_store.hpp"
 #include "settings.hpp"
@@ -80,7 +81,8 @@ QString resolve(const QString& base_dir, const QString& path) {
     return QFileInfo(path).isAbsolute() ? path : QDir(base_dir).filePath(path);
 }
 
-std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_dir, double depth_offset) {
+std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_dir, double depth_offset,
+                                    const std::string& record_dir) {
     const QString type = s.value("type").toString();
     if (type == "sim") {
         boat::sim::SimSettings sim;
@@ -106,6 +108,7 @@ std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_di
         c.lines_per_second = s.value("lines_per_second").toDouble(20.0);
         c.parser.depth_offset_m = depth_offset;
         c.parser.accept_missing_checksum = s.value("accept_missing_checksum").toBool(false);
+        c.record_dir = record_dir;
         return std::make_unique<boat::nmea0183::Nmea0183Source>("nmea0183-" + kind.toStdString(), c);
     }
     if (type == "nmea2000") {
@@ -116,8 +119,10 @@ std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_di
         } else {
             can = std::make_unique<boat::hal::SocketCanBus>(s.value("interface").toString("can0").toStdString());
         }
+        // a replayed candump log is not recorded again
         return std::make_unique<boat::nmea2000::Nmea2000Source>("nmea2000", std::move(can),
-                                                                boat::nmea2000::DecoderOptions{depth_offset});
+                                                                boat::nmea2000::DecoderOptions{depth_offset},
+                                                                s.contains("candump") ? std::string() : record_dir);
     }
     throw std::runtime_error("unknown source type: " + type.toStdString());
 }
@@ -182,7 +187,8 @@ int main(int argc, char* argv[]) {
     const double depth_offset = config.value("depth_offset_m").toDouble(0.0);
     for (const auto& value : config.value("sources").toArray()) {
         try {
-            modules.push_back(make_source(value.toObject(), base_dir, depth_offset));
+            modules.push_back(make_source(value.toObject(), base_dir, depth_offset,
+                                          resolve(base_dir, config.value("record_dir").toString("logs")).toStdString()));
         } catch (const std::exception& e) {
             // One broken source (e.g. no CAN interface) must not stop the others
             qWarning() << "OpenBoat: source not started:" << e.what();
@@ -213,7 +219,8 @@ int main(int argc, char* argv[]) {
         c.baud = o.value("baud").toInt(4800);
         modules.push_back(std::make_unique<boat::nmea0183::Nmea0183Output>(c));
     }
-    settings.publishDepthOffset();  // before the sources start: the first depth already uses it
+    settings.publishDepthOffset();
+    settings.publishRecording();  // before the sources start: the first depth already uses it
     for (auto& m : modules) m->start(bus);
 
     // Declared before the engine so it outlives the QML that binds to it
@@ -257,6 +264,8 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("routes"), &routes);
+    Logbook logbook(bus, resolve(base_dir, config.value("logbook_file").toString("logbook.json")));
+    engine.rootContext()->setContextProperty(QStringLiteral("logbook"), &logbook);
     engine.rootContext()->setContextProperty(QStringLiteral("settings"), &settings);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
     engine.rootContext()->setContextProperty(QStringLiteral("startNight"), cli.isSet(night_opt));

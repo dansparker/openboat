@@ -261,6 +261,20 @@ Rectangle {
                     current: settings.showTrack
                     onChosen: v => settings.showTrack = v
                 }
+                ChoiceRow {
+                    label: "NMEA-Rohdaten mitschneiden"
+                    options: [{ value: true, text: "Ein" }, { value: false, text: "Aus" }]
+                    current: settings.recordRaw
+                    onChosen: v => settings.recordRaw = v
+                }
+                Text {
+                    width: content.width
+                    wrapMode: Text.WordWrap
+                    color: Theme.label
+                    font.pixelSize: 14
+                    text: "Eine Datei pro Tag im Ordner „logs“ (max. 200 MB/Tag). Wiedergabe mit Originaltakt: Quelle "
+                          + "{ \"type\": \"nmea0183\", \"kind\": \"file\", \"path\": … } bzw. { \"type\": \"nmea2000\", \"candump\": … }."
+                }
                 StepRow {
                     label: "Punktabstand"
                     value: settings.trackSpacing
