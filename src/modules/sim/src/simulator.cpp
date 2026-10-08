@@ -36,8 +36,10 @@ SimState simulate(double t, const SimSettings& settings) {
     s.cog = {course, kSpeedMps};
     s.heading = {core::normalize_deg(course - 3.0), true, std::nullopt, false};  // 3 deg leeway
     s.stw = {kSpeedMps * 0.97};
-    // Depth: shelf near the shore (north), deep water elsewhere
-    s.depth = {std::max(1.2, 25.0 + 22.0 * std::cos(bearing * kDeg)), -0.4};
+    // Depth: deepest at the north of the circle, shallowest at the south
+    const double mid = (settings.depth_min_m + settings.depth_max_m) / 2.0;
+    const double half = (settings.depth_max_m - settings.depth_min_m) / 2.0;
+    s.depth = {std::max(0.5, mid + half * std::cos(bearing * kDeg)), -0.4};
     s.water = {17.5 + 0.5 * std::sin(t / 600.0)};
 
     // Apparent wind = true wind + headwind from own motion (boat frame)

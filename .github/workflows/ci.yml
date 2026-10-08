@@ -63,6 +63,10 @@ jobs:
           test -f charts/base.mbtiles || { pip install pillow && python3 tools/make_basemap.py --bbox 13.50,47.84,13.62,47.95 --zooms 11-15 --out charts/base.mbtiles; } || { rm -f charts/base.mbtiles; echo "::warning::base chart not rendered (Overpass unavailable) - screenshots without base map"; }
       - name: Chart tool tests
         run: pip install numpy pillow && python3 tests/python/test_tools.py
+      - name: ENC converter through GDAL (system Python with python3-gdal)
+        run: |
+          sudo apt-get install -y python3-gdal python3-numpy python3-pil
+          /usr/bin/python3 tests/python/test_enc_gdal.py
       - name: SYNTHETIC depth overlay for the screenshots (labelled as such, never shipped)
         run: |
           if [ -f charts/base.mbtiles ]; then

@@ -29,6 +29,9 @@ struct SimState {
 struct SimSettings {
     core::GeoPoint centre{47.8700, 13.5450};  // Attersee
     double radius_m = 900.0;                  // must stay on the water
+    // Depth along the circle varies between these (deepest towards north)
+    double depth_min_m = 3.0;
+    double depth_max_m = 47.0;
     // The demo AIS targets are placed for the Attersee: off elsewhere
     bool ais_targets = true;
 };

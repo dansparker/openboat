@@ -37,6 +37,10 @@ FORBIDDEN_HOSTS = (
 
 
 def tile_range(lon_min, lat_min, lon_max, lat_max, z):
+    if lon_min > lon_max:
+        # The app draws across the date line; the tools need two runs (one per side)
+        sys.exit("bbox crosses the date line (lon_min > lon_max): split it into two areas, e.g. "
+                 f"{lon_min},{lat_min},180,{lat_max} and -180,{lat_min},{lon_max},{lat_max}")
     def tx(lon):
         return int((lon + 180.0) / 360.0 * (1 << z))
 

@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "tools"))
 import numpy as np  # noqa: E402
 
 import make_depth  # noqa: E402
+import make_enc  # noqa: E402
 
 
 def grid(values):
@@ -59,6 +60,40 @@ def test_labels_sidecar_merges_zoom_levels(tmp="labels-test.json"):
     assert n == 2
     five = [l for l in data["labels"] if l["text"] == "5"][0]
     assert five["z"] == [12, 13]
+
+
+def test_enc_attributes():
+    # GDAL returns list attributes as lists or strings depending on the version
+    assert make_enc.int_list(["3", "4"]) == [3, 4]
+    assert make_enc.int_list("2,6") == [2, 6]
+    assert make_enc.int_list(None) == []
+    m = make_enc.mark_from_feature("BOYCAR", {"BOYSHP": 4, "COLOUR": "2,6", "CATCAM": 1, "OBJNAM": " N1 "}, 9.08, 47.67)
+    assert (m["kind"], m["shape"], m["colours"], m["catcam"], m["name"]) == ("buoy", 4, [2, 6], 1, "N1")
+    assert make_enc.mark_from_feature("LIGHTS", {}, 0, 0)["kind"] == "light"
+    assert make_enc.mark_from_feature("BCNLAT", {"BCNSHP": "x"}, 0, 0)["shape"] == 0
+
+
+def test_enc_marks_tile_draws_symbols():
+    from PIL import Image
+    import io
+    lon, lat, z = 9.08, 47.67, 16
+    wx, wy = make_enc.world(lon, lat, z)
+    marks = [make_enc.mark_from_feature("BOYLAT", {"BOYSHP": 2, "COLOUR": "3"}, lon, lat)]
+    png = make_enc.render_marks_tile(z, int(wx // 256), int(wy // 256), marks, [], [])
+    img = Image.open(io.BytesIO(png)).convert("RGBA")
+    px = [img.getpixel((x, y)) for x in range(256) for y in range(256)]
+    assert any(p[3] > 0 and p[0] > 150 and p[1] < 80 for p in px)  # a red can is drawn
+    # far away tile: empty
+    empty = Image.open(io.BytesIO(make_enc.render_marks_tile(z, 0, 0, marks, [], []))).convert("RGBA")
+    assert empty.getextrema()[3] == (0, 0)
+
+
+def test_enc_labels_soundings_and_names():
+    labels = make_enc.labels_sidecar([(9.08, 47.67, 2.4)], [{"lon": 9.09, "lat": 47.67, "name": "Tonne 3"}], 13, 15)
+    d = [l for l in labels if l["kind"] == "depth"][0]
+    assert d["text"] == "2.4" and d["z"] == [14, 15]
+    n = [l for l in labels if l["text"] == "Tonne 3"][0]
+    assert n["z"] == [15]
 
 
 if __name__ == "__main__":

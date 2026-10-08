@@ -62,12 +62,17 @@ Item {
         const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
         return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * worldSize;
     }
-    function lonAt(x) { return (x - width / 2 + centerX) / worldSize * 360 - 180; }
+    // Across the date line the world repeats: use the copy nearest to the view
+    function wrapDx(d) { return d - Math.round(d / worldSize) * worldSize; }
+    function lonAt(x) {
+        const lon = (x - width / 2 + centerX) / worldSize * 360 - 180;
+        return ((lon + 180) % 360 + 360) % 360 - 180;
+    }
     function latAt(y) {
         const n = Math.PI * (1 - 2 * (y - height / 2 + centerY) / worldSize);
         return Math.atan(Math.sinh(n)) * 180 / Math.PI;
     }
-    function screenX(lon) { return worldX(lon) - centerX + width / 2; }
+    function screenX(lon) { return wrapDx(worldX(lon) - centerX) + width / 2; }
     function screenY(lat) { return worldY(lat) - centerY + height / 2; }
     // Metres per screen pixel at a latitude
     function metresPerPixel(lat) { return 40075016.686 * Math.cos(lat * Math.PI / 180) / worldSize; }
@@ -114,7 +119,7 @@ Item {
     function aisAt(lat, lon) {
         let best = null, bestD = 30;
         for (const t of boat.aisTargets) {
-            const d = Math.hypot(worldX(t.lon) - worldX(lon), worldY(t.lat) - worldY(lat));
+            const d = Math.hypot(wrapDx(worldX(t.lon) - worldX(lon)), worldY(t.lat) - worldY(lat));
             if (d < bestD) { best = t; bestD = d; }
         }
         return best;
@@ -521,6 +526,8 @@ Item {
                 out.push({ wx: worldX(lab.lon), wy: worldY(lab.lat), text: lab.text, kind: lab.kind });
             }
         }
+        const rank = { city: 0, town: 1, village: 2, place: 3, hamlet: 4, depth: 5 };
+        out.sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3));
         return out;
     }
     onChartLabelsChanged: labelCanvas.requestPaint()
@@ -534,6 +541,17 @@ Item {
         function toScreen(x, y) {
             const v = chart.rot(x - chart.width / 2, y - chart.height / 2, -chart.upDeg);
             return { x: chart.width / 2 + v.x, y: chart.height / 2 + v.y };
+        }
+        // Upright boxes already drawn in this paint: a label overlapping one is skipped
+        property var boxes: []
+        function fits(ctx, x, y, text, font, align) {
+            ctx.font = font;
+            const w = ctx.measureText(text).width + 6, h = parseInt(font.match(/(\d+)px/)[1]) + 4;
+            const left = align === "center" ? x - w / 2 : align === "right" ? x - w : x;
+            const b = { l: left, r: left + w, t: y - h / 2, b: y + h / 2 };
+            for (const o of boxes) if (b.l < o.r && b.r > o.l && b.t < o.b && b.b > o.t) return false;
+            boxes.push(b);
+            return true;
         }
         function draw(ctx, x, y, text, font, colour, halo, align) {
             ctx.font = font;
@@ -553,18 +571,23 @@ Item {
             const place = Theme.night ? "#a03030" : "#282828";
             const depth = Theme.night ? "#802020" : "#1e325a";
             const depthHalo = Theme.night ? "black" : "rgba(235,242,250,0.95)";
-            if (settings.showLabels) {
-                for (const l of chart.chartLabels) {
-                    const p = toScreen(l.wx - chart.centerX + chart.width / 2, l.wy - chart.centerY + chart.height / 2);
-                    if (p.x < -100 || p.y < -20 || p.x > width + 100 || p.y > height + 20) continue;
-                    if (l.kind === "depth") draw(ctx, p.x, p.y, l.text, "11px sans-serif", depth, depthHalo, "center");
-                    else draw(ctx, p.x, p.y, l.text, (l.kind === "city" || l.kind === "town") ? "bold 16px sans-serif" : "13px sans-serif",
-                              place, halo, "center");
-                }
-            }
+            boxes = [];
+            // Own symbols' texts first (waypoints, AIS, MOB): always drawn and they reserve their space
             for (const t of overlay.texts) {
                 const p = toScreen(t.x, t.y);
+                fits(ctx, p.x + t.dx, p.y + t.dy, t.text, t.font, t.align);
                 draw(ctx, p.x + t.dx, p.y + t.dy, t.text, t.font, t.colour, Theme.night ? "black" : "rgba(255,255,255,0.8)", t.align);
+            }
+            if (settings.showLabels) {
+                for (const l of chart.chartLabels) {
+                    const p = toScreen(chart.wrapDx(l.wx - chart.centerX) + chart.width / 2, l.wy - chart.centerY + chart.height / 2);
+                    if (p.x < -100 || p.y < -20 || p.x > width + 100 || p.y > height + 20) continue;
+                    const font = l.kind === "depth" ? "11px sans-serif"
+                               : (l.kind === "city" || l.kind === "town") ? "bold 16px sans-serif" : "13px sans-serif";
+                    if (!fits(ctx, p.x, p.y, l.text, font, "center")) continue;
+                    if (l.kind === "depth") draw(ctx, p.x, p.y, l.text, font, depth, depthHalo, "center");
+                    else draw(ctx, p.x, p.y, l.text, font, place, halo, "center");
+                }
             }
         }
     }
