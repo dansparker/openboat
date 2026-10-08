@@ -22,6 +22,11 @@ funktional angelehnt an Geräte wie den Garmin GPSMAP 9000xsv. Schwesterprojekt 
 ![OpenBoat – Kurs oben](docs/screenshots/courseup.png)
 </details>
 
+<details><summary>AIS-Zielliste</summary>
+
+![OpenBoat – AIS-Zielliste](docs/screenshots/ais.png)
+</details>
+
 <details><summary>Einstellungen</summary>
 
 ![OpenBoat – Einstellungen](docs/screenshots/settings.png)
