@@ -78,7 +78,7 @@ TEST(Ais, Type21AidToNavigation) {
 }
 
 TEST(Ais, Type21NameExtension) {
-    const auto r = nmea0183::AisDecoder::decode_payload("E>j9bPhRa6Pb4W3RW@40S2W2TW30Dj50=`oB010888v0024U0", 4);
+    const auto r = nmea0183::AisDecoder::decode_payload("E>j9bPhRa6Pb4W3RW@40S2W2TW30Dj50=`oB010888v000B4U0", 4);
     ASSERT_TRUE(r);
     EXPECT_EQ(r->name, "ERMATINGEN HAFENEINFAHRT");
     EXPECT_FALSE(r->virtual_aton);
