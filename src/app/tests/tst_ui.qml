@@ -45,18 +45,22 @@ TestCase {
         chart.editRouteIndex = -1;
         chart.editPoints = [];
         mouseClick(chart, 200, 200);
+        wait(600);
         mouseClick(chart, 500, 400);
+        wait(600);
         compare(chart.editPoints.length, 2, "tap appends");
         // the (+) handle in the middle of the leg inserts a point there
         mouseClick(chart, 350, 300);
         compare(chart.editPoints.length, 3, "handle inserts");
-        // hold on a point deletes it
+        // hold on a point deletes it (pause first: a press right after a click is a double click)
+        wait(600);
         mousePress(chart, 200, 200);
         wait(1200);
         mouseRelease(chart, 200, 200);
         compare(chart.editPoints.length, 2, "hold deletes");
         // drag moves a point
         const lat0 = chart.editPoints[0].lat;
+        wait(600);
         mousePress(chart, 350, 300);
         for (let i = 1; i <= 10; ++i) mouseMove(chart, 350, 300 + i * 10);
         mouseRelease(chart, 350, 400);
@@ -71,7 +75,12 @@ TestCase {
         const page = find("logbookPage");
         page.visible = true;
         const before = logbook.entries.length;
-        mouseClick(find("quick_Abgelegt"));
+        // delegates of a Repeater: look them up in their grid
+        const grid = find("quickGrid");
+        let button = null;
+        for (const c of grid.children) if (c.text === "Abgelegt") button = c;
+        verify(button !== null, "no quick entry button");
+        mouseClick(button);
         compare(logbook.entries.length, before + 1);
         compare(logbook.entries[0].text, "Abgelegt");
     }

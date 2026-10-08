@@ -49,6 +49,7 @@ Rectangle {
 
         // One-touch entries
         GridLayout {
+            objectName: "quickGrid"
             Layout.fillWidth: true
             columns: 6
             columnSpacing: 6
