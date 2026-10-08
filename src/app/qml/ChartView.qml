@@ -639,6 +639,9 @@ Item {
             chart.tapped(chart.latAt(p.y), chart.lonAt(p.x));
         }
         onPressAndHold: mouse => {
+            console.log("DEBUG hold moved", moved, "mouse", mouse.x, mouse.y, "editing", chart.editing,
+                        "point", chart.editing ? chart.editPointAt(chart.unrotate(mouse.x, mouse.y).x, chart.unrotate(mouse.x, mouse.y).y) : -2,
+                        "pts", JSON.stringify(chart.editPoints.map(q => [chart.screenX(q.lon), chart.screenY(q.lat)])));
             if (moved) return;
             const p = chart.unrotate(mouse.x, mouse.y);
             if (chart.editing) {
