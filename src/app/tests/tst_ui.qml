@@ -8,6 +8,7 @@ TestCase {
     when: windowShown
 
     Component { id: mainComponent; Main {} }
+    SignalSpy { id: holdSpy; signalName: "pressAndHold" }
 
     property var main: null
 
@@ -40,6 +41,7 @@ TestCase {
 
     function test_route_editing_on_the_chart() {
         const chart = find("chartView");
+        holdSpy.target = find("chartMouse");
         const before = routes.routes.length;
         chart.editing = true;
         chart.editRouteIndex = -1;
@@ -53,12 +55,15 @@ TestCase {
         mouseClick(chart, 350, 300);
         compare(chart.editPoints.length, 3, "handle inserts");
         // hold on a point deletes it (pause first: a press right after a click is a double click)
-        // MouseArea emits pressAndHold only while hovered: move there first, like a real finger/mouse
         wait(600);
+        holdSpy.clear();
         mouseMove(chart, 200, 200);
         mousePress(chart, 200, 200);
-        wait(1200);
+        holdSpy.wait(3000);
+        console.log("pressAndHold emitted:", holdSpy.count, "points:", chart.editPoints.length,
+                    "interval:", Qt.styleHints.mousePressAndHoldInterval);
         mouseRelease(chart, 200, 200);
+        compare(holdSpy.count, 1, "long press recognised");
         compare(chart.editPoints.length, 2, "hold deletes");
         // drag moves a point
         const lat0 = chart.editPoints[0].lat;

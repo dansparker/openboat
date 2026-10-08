@@ -594,6 +594,7 @@ Item {
 
     // ---- Interaction ----------------------------------------------------------
     MouseArea {
+        objectName: "chartMouse"
         anchors.fill: parent
         property real lastX: 0
         property real lastY: 0
