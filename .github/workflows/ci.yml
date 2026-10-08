@@ -51,6 +51,10 @@ jobs:
         run: cmake --preset release -DBOAT_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build --preset release
+      - name: App and UI tests (headless)
+        run: |
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software timeout 120 ./build/release/src/app/tests/boat_app_tests
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software timeout 180 ./build/release/src/app/tests/boat_ui_tests
       - name: Base chart for the simulator area (cached; rebuilt when the tool changes)
         uses: actions/cache@v4
         with:

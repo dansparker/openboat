@@ -186,6 +186,7 @@ void BoatModel::poll() {
             m[QStringLiteral("kind")] = kind_name(e.kind);
             m[QStringLiteral("ageMin")] = e.age_s / 60.0;
             m[QStringLiteral("addressed")] = e.message.addressed;
+            m[QStringLiteral("destination")] = static_cast<qulonglong>(e.message.destination);
             ais_messages_.append(m);
         }
     }

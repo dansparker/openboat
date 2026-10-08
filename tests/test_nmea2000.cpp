@@ -185,6 +185,30 @@ TEST(Nmea2000, AisAidToNavigationAndBaseStation) {
     EXPECT_EQ(bus.latest<core::AisReport>()->value.station, core::AisStation::BaseStation);
 }
 
+TEST(Nmea2000, AisAddressedSafetyMessage) {
+    core::DataBus bus;
+    nmea2000::Decoder d(bus);
+    // header, source, transceiver/sequence, destination, one reserved byte, text
+    std::vector<std::uint8_t> msg{12, 0, 0, 0, 0, 0x00, 0, 0, 0, 0, 0xFF};
+    put32(msg, 1, 211000001U);
+    put32(msg, 6, 211999999U);
+    const std::string text = "STURMWARNUNG";
+    msg.push_back(static_cast<std::uint8_t>(text.size() + 2));
+    msg.push_back(1);
+    msg.insert(msg.end(), text.begin(), text.end());
+    nmea2000::Message m;
+    m.id.pgn = 129801;
+    m.data = msg;
+    ASSERT_TRUE(d.decode(m));
+    auto s = bus.latest<core::AisSafetyMessage>()->value;
+    EXPECT_TRUE(s.addressed);
+    EXPECT_EQ(s.destination, 211999999U);
+    EXPECT_EQ(s.text, "STURMWARNUNG");
+    // a text field that does not end with the message is rejected (no guessing)
+    m.data.push_back(0x42);
+    EXPECT_FALSE(d.decode(m));
+}
+
 TEST(Nmea2000, AisSafetyBroadcast) {
     core::DataBus bus;
     nmea2000::Decoder d(bus);

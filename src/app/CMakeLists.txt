@@ -62,6 +62,12 @@ else()
     message(STATUS "OpenBoat: Qt Multimedia not found - alarm sound only via GPIO buzzer")
 endif()
 
+option(BOAT_BUILD_APP_TESTS "Qt tests of the app (models and UI)" ON)
+if(BOAT_BUILD_APP_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 qt_add_executable(openboat src/main.cpp)
 target_compile_definitions(openboat PRIVATE OPENBOAT_VERSION="${PROJECT_VERSION}")
 target_link_libraries(openboat PRIVATE

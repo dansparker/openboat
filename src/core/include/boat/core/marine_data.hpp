@@ -150,7 +150,8 @@ struct AisReport {
 struct AisSafetyMessage {
     std::uint32_t mmsi = 0;
     std::string text;
-    bool addressed = false;  // message 12: addressed to one station (possibly us)
+    bool addressed = false;  // message 12 / PGN 129801: addressed to one station
+    std::uint32_t destination = 0;  // its MMSI (addressed only)
 };
 
 }  // namespace boat::core

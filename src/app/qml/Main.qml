@@ -38,6 +38,7 @@ Window {
 
             ChartView {
                 id: chartView
+                objectName: "chartView"
                 anchors.fill: parent
                 layers: chartLayers
                 waypoints: routes.waypoints
@@ -129,7 +130,7 @@ Window {
                     }
                     TouchButton { text: "↶"; implicitHeight: 46; enabled: chartView.editPoints.length > 0; onClicked: chartView.editPoints = chartView.editPoints.slice(0, -1) }
                     TouchButton {
-                        text: "Speichern"; fontSize: 15; implicitHeight: 46
+                        objectName: "editSave"; text: "Speichern"; fontSize: 15; implicitHeight: 46
                         enabled: chartView.editPoints.length >= 2
                         onClicked: { window.saveEditedRoute(); chartView.editing = false; chartView.editPoints = []; }
                     }
@@ -187,6 +188,7 @@ Window {
 
             NavPage {
                 id: navPage
+                objectName: "navPage"
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
@@ -205,6 +207,7 @@ Window {
 
             LogbookPage {
                 id: logbookPage
+                objectName: "logbookPage"
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
@@ -214,6 +217,7 @@ Window {
 
             AisPage {
                 id: aisPage
+                objectName: "aisPage"
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
@@ -237,6 +241,7 @@ Window {
 
             SettingsPage {
                 id: settingsPage
+                objectName: "settingsPage"
                 visible: false
                 anchors.fill: parent
                 anchors.margins: 30
@@ -263,7 +268,7 @@ Window {
                 border.color: "white"
                 border.width: 2
                 Text { anchors.centerIn: parent; text: "MOB"; color: "white"; font.pixelSize: 26; font.bold: true }
-                MouseArea { id: mobMouse; anchors.fill: parent; onClicked: routes.manOverboard() }
+                MouseArea { id: mobMouse; objectName: "mobButton"; anchors.fill: parent; onClicked: routes.manOverboard() }
             }
 
             DataBar {
@@ -295,6 +300,7 @@ Window {
                 TouchButton {
                     Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 14
+                    objectName: "routesButton"
                     text: "Routen/Tracks"
                     checked: navPage.visible
                     onClicked: { settingsPage.visible = false; aisPage.visible = false; logbookPage.visible = false; navPage.visible = !navPage.visible; }
@@ -302,6 +308,7 @@ Window {
                 TouchButton {
                     Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
+                    objectName: "setupButton"
                     text: "Setup"
                     checked: settingsPage.visible
                     onClicked: { navPage.visible = false; aisPage.visible = false; logbookPage.visible = false; settingsPage.visible = !settingsPage.visible; }
@@ -310,6 +317,7 @@ Window {
                     Layout.columnSpan: 2
                     Layout.fillWidth: true; Layout.preferredWidth: 100  /* equal columns */
                     fontSize: 16
+                    objectName: "aisButton"
                     text: "AIS-Ziele (" + boat.aisTargets.length + ")"
                     checked: aisPage.visible
                     onClicked: { navPage.visible = false; settingsPage.visible = false; logbookPage.visible = false; aisPage.selected = 0; aisPage.visible = !aisPage.visible; }

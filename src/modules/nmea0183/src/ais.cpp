@@ -180,6 +180,7 @@ std::optional<AisMessage> AisDecoder::decode_message(std::string_view payload, i
         core::AisSafetyMessage m;
         m.mmsi = b.u(8, 30);
         m.addressed = type == 12;
+        if (m.addressed) m.destination = b.u(40, 30);
         m.text = b.text(start, (b.size() - start) / 6);
         if (m.text.empty()) return std::nullopt;
         return AisMessage{std::nullopt, std::move(m)};

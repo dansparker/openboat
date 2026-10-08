@@ -125,7 +125,7 @@ Rectangle {
                             wrapMode: Text.WordWrap
                             color: parent.urgent ? "white" : Theme.text
                             font.pixelSize: 16
-                            text: "✉ " + modelData.sender + (modelData.addressed ? " (an uns)" : "") + ": „" + modelData.text + "“  ·  vor "
+                            text: "✉ " + modelData.sender + (modelData.addressed ? " an " + modelData.destination : "") + ": „" + modelData.text + "“  ·  vor "
                                   + (modelData.ageMin < 1 ? "<1" : Math.round(modelData.ageMin)) + " min"
                         }
                     }

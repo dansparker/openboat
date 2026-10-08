@@ -102,7 +102,7 @@ bool is_fast_packet(std::uint32_t pgn) {
         case 126208: case 126464: case 126996: case 127489: case 128275:
         case 129029: case 129038: case 129039: case 129040: case 129041: case 129284:
         case 129285: case 129540: case 129794: case 129809: case 129810:
-        case 129793: case 129802: case 130074:
+        case 129793: case 129801: case 129802: case 130074:
             return true;
         default:
             return false;
@@ -297,7 +297,24 @@ bool Decoder::decode(const Message& m) {
             bus_.publish(a);
             return true;
         }
-        case 129802: {  // AIS safety related broadcast message (129801, addressed: not decoded)
+        case 129801: {  // AIS addressed safety related message
+            // Destination after the transceiver/sequence byte. The text is the last field: its
+            // length byte must reach exactly to the end of the message - that finds it whatever
+            // the reserved bytes in between, and rejects anything that does not fit.
+            core::AisSafetyMessage s;
+            s.addressed = true;
+            s.mmsi = r.u32(1).value_or(0) & 0x3FFFFFFF;
+            s.destination = r.u32(6).value_or(0) & 0x3FFFFFFF;
+            std::optional<std::string> text;
+            for (std::size_t at = 10; at <= 12 && !text; ++at) {
+                if (r.has(at) && r.u8(at) >= 2 && at + r.u8(at) == m.data.size()) text = r.text_lau(at);
+            }
+            if (s.mmsi == 0 || !text || text->empty()) return false;
+            s.text = std::move(*text);
+            bus_.publish(s);
+            return true;
+        }
+        case 129802: {  // AIS safety related broadcast message
             core::AisSafetyMessage s;
             s.mmsi = r.u32(1).value_or(0) & 0x3FFFFFFF;  // 30 bit + 2 reserved
             auto text = r.text_lau(6);                    // after the transceiver byte

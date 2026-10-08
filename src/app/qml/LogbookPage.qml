@@ -61,6 +61,7 @@ Rectangle {
                     Layout.preferredWidth: 100
                     implicitHeight: 46
                     fontSize: 14
+                    objectName: "quick_" + modelData
                     text: modelData
                     onClicked: logbook.add(modelData)
                 }

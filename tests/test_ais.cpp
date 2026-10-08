@@ -99,4 +99,5 @@ TEST(Ais, SafetyMessagesViaParser) {
     m = bus.latest<core::AisSafetyMessage>();
     EXPECT_EQ(m->value.text, "STURMWARNUNG");
     EXPECT_TRUE(m->value.addressed);
+    EXPECT_EQ(m->value.destination, 211999999U);
 }
