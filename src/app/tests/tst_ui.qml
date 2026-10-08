@@ -53,7 +53,9 @@ TestCase {
         mouseClick(chart, 350, 300);
         compare(chart.editPoints.length, 3, "handle inserts");
         // hold on a point deletes it (pause first: a press right after a click is a double click)
+        // MouseArea emits pressAndHold only while hovered: move there first, like a real finger/mouse
         wait(600);
+        mouseMove(chart, 200, 200);
         mousePress(chart, 200, 200);
         wait(1200);
         mouseRelease(chart, 200, 200);
