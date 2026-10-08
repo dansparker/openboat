@@ -68,7 +68,9 @@ SimState simulate(double t) {
     s.anchored.beam_m = 3.0;
     s.anchored.sog_mps = 0.0;
     s.anchored.cog_deg = 0.0;
-    s.anchored.position = core::destination(kCentre, 60.0, 1700.0);
+    // Far enough from the circle that no straight-line CPA comes near (a boat at
+    // anchor dead ahead SHOULD alarm - just not in every demo screenshot)
+    s.anchored.position = core::destination(kCentre, 340.0, 2600.0);
 
     s.beacon.mmsi = 972000123;
     s.beacon.nav_status = 15;  // test
