@@ -29,8 +29,18 @@ jobs:
           cache: true
       - name: Build
         run: cmake --preset release -DBOAT_BUILD_TESTS=OFF && cmake --build --preset release
+      # Per area: a second run for the same bbox needs no Overpass / OpenSeaMap requests
+      - name: Charts cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            charts/area.mbtiles
+            charts/area.mbtiles.labels.json
+            charts/area-seamarks.mbtiles
+          key: area-${{ inputs.bbox }}-${{ hashFiles('tools/make_basemap.py', 'tools/fetch_tiles.py') }}
       - name: Base chart from OpenStreetMap (Overpass, several attempts)
         run: |
+          test -f charts/area.mbtiles && exit 0
           pip install pillow
           for i in 1 2 3; do
             python3 tools/make_basemap.py --bbox "${{ inputs.bbox }}" --zooms 11-17 --out charts/area.mbtiles && break
@@ -39,7 +49,11 @@ jobs:
           test -f charts/area.mbtiles
       - name: OpenSeaMap seamarks (small area, polite)
         run: |
-          python3 tools/fetch_tiles.py --url "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" --bbox "${{ inputs.bbox }}" --zooms 14-16 --out charts/area-seamarks.mbtiles --name "OpenSeaMap seamarks" --attribution "OpenSeaMap, CC BY-SA" --overlay --delay 0.5 || true
+          test -f charts/area-seamarks.mbtiles && exit 0
+          # only the zoom levels that are photographed
+          zooms=$(echo "${{ inputs.zooms }}" | tr ' ' '
+' | sort -n | sed -n '1p;$p' | paste -sd- -)
+          python3 tools/fetch_tiles.py --url "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" --bbox "${{ inputs.bbox }}" --zooms "$zooms" --out charts/area-seamarks.mbtiles --name "OpenSeaMap seamarks" --attribution "OpenSeaMap, CC BY-SA" --overlay --delay 0.5 || true
       - name: Screenshots
         run: |
           python3 - <<'PY'
