@@ -6,6 +6,7 @@ Rectangle {
     id: page
     signal closeRequested()
     signal newRoute()
+    signal editRoute(int index)
 
     color: Theme.panel
     border.color: Theme.panelBorder
@@ -29,8 +30,49 @@ Rectangle {
             Layout.fillWidth: true
             Text { text: "Wegpunkte & Routen"; color: Theme.text; font.pixelSize: 22; font.bold: true; Layout.fillWidth: true }
             TouchButton { text: "Neue Route"; fontSize: 15; implicitHeight: 46; onClicked: page.newRoute() }
+            TouchButton { text: "USB"; fontSize: 15; implicitHeight: 46; checked: usbBox.visible; onClicked: { usbBox.visible = !usbBox.visible; if (usbBox.visible) routes.refreshUsb(); } }
             TouchButton { text: "✕"; implicitHeight: 46; onClicked: page.closeRequested() }
         }
+        // USB stick: export everything, import GPX files (OpenCPN, Garmin, Navionics, ...)
+        Rectangle {
+            id: usbBox
+            visible: false
+            Layout.fillWidth: true
+            implicitHeight: usbCol.implicitHeight + 16
+            color: Theme.background
+            radius: 4
+            border.color: Theme.panelBorder
+            Column {
+                id: usbCol
+                x: 8; y: 8
+                width: parent.width - 16
+                spacing: 6
+                RowLayout {
+                    width: parent.width
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: Theme.text
+                        font.pixelSize: 15
+                        text: routes.usbDrives.length === 0 ? "Kein USB-Stick gefunden – einstecken und „Aktualisieren“"
+                                                             : "USB: " + routes.usbDrives.join(", ")
+                    }
+                    TouchButton { text: "Aktualisieren"; fontSize: 14; implicitHeight: 44; onClicked: routes.refreshUsb() }
+                    TouchButton { text: "Alles exportieren"; fontSize: 14; implicitHeight: 44; enabled: routes.usbDrives.length > 0; onClicked: routes.exportToUsb() }
+                }
+                Text { visible: routes.usbMessage !== ""; width: parent.width; wrapMode: Text.WordWrap; color: Theme.accent; font.pixelSize: 14; text: routes.usbMessage }
+                Repeater {
+                    model: routes.usbFiles
+                    RowLayout {
+                        required property var modelData
+                        width: usbCol.width
+                        Text { Layout.fillWidth: true; elide: Text.ElideMiddle; color: Theme.text; font.pixelSize: 15; text: modelData.drive + "/" + modelData.name }
+                        TouchButton { text: "Importieren"; fontSize: 14; implicitHeight: 44; onClicked: routes.importGpx(modelData.path) }
+                    }
+                }
+            }
+        }
+
         Text {
             visible: routes.lastError !== ""
             text: "Speichern fehlgeschlagen: " + routes.lastError
@@ -63,6 +105,8 @@ Rectangle {
                         }
                         TouchButton { text: "Start"; fontSize: 14; implicitHeight: 44; onClicked: { routes.startRoute(index, false); page.closeRequested(); } }
                         TouchButton { text: "Rückwärts"; fontSize: 14; implicitHeight: 44; onClicked: { routes.startRoute(index, true); page.closeRequested(); } }
+                        TouchButton { text: "Bearbeiten"; fontSize: 14; implicitHeight: 44; onClicked: page.editRoute(index) }
+                        TouchButton { text: "Prüfen"; fontSize: 14; implicitHeight: 44; onClicked: { routes.checkRoute(index, settings.safetyDepth); page.closeRequested(); } }
                         TouchButton { text: "Löschen"; fontSize: 14; implicitHeight: 44; onHeld: routes.removeRoute(index) }
                     }
                 }

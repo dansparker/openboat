@@ -60,6 +60,10 @@ public:
     QString speedLabel() const { return speed_unit_ == QLatin1String("kmh") ? QStringLiteral("km/h") : QStringLiteral("kn"); }
     double depthFactor() const { return depth_unit_ == QLatin1String("ft") ? 1.0 / 0.3048 : 1.0; }
     QString depthLabel() const { return depth_unit_; }
+    // "3.0 m" / "10 ft" in the selected unit
+    Q_INVOKABLE QString depthText(double metres) const {
+        return QStringLiteral("%1 %2").arg(metres * depthFactor(), 0, 'f', depth_unit_ == QLatin1String("ft") ? 0 : 1).arg(depth_unit_);
+    }
     double distanceFactor() const { return distance_unit_ == QLatin1String("km") ? 1.852 : 1.0; }
     QString distanceLabel() const { return distance_unit_ == QLatin1String("km") ? QStringLiteral("km") : QStringLiteral("sm"); }
     double shallowAlarm() const { return shallow_; }

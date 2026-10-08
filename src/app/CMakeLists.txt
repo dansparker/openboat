@@ -34,6 +34,8 @@ qt_add_qml_module(boat_ui
         src/boat_model.cpp
         src/depth_style.hpp
         src/depth_style.cpp
+        src/depth_chart.hpp
+        src/depth_chart.cpp
         src/settings.hpp
         src/settings.cpp
         src/route_store.hpp

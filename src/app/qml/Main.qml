@@ -9,6 +9,15 @@ Window {
     visibility: startFullScreen ? Window.FullScreen : Window.Windowed
     title: "OpenBoat"
     color: Theme.background
+    // Saves the route on the chart editor; returns its index
+    // ... and checks it against the safety depth right away
+    function saveEditedRoute() {
+        let i = chartView.editRouteIndex;
+        if (i < 0 || !routes.updateRoute(i, chartView.editPoints)) i = routes.addRoute(chartView.editPoints);
+        if (i >= 0) routes.checkRoute(i, settings.safetyDepth);
+        return i;
+    }
+
     Component.onCompleted: {
         Theme.night = startNight;
         chartView.setZoom(startZoom);
@@ -42,10 +51,6 @@ Window {
                 }
                 onTapped: (lat, lon) => {
                     menu.visible = false;
-                    if (editing) {
-                        editPoints = editPoints.concat([{ lat: lat, lon: lon }]);
-                        return;
-                    }
                     // Tap on an AIS target: its details in the AIS list
                     const t = aisAt(lat, lon);
                     if (t) {
@@ -64,6 +69,43 @@ Window {
                 anchors.bottomMargin: 30
             }
 
+            // Result of the route check against the depth chart
+            Rectangle {
+                readonly property var c: routes.routeCheck
+                visible: c.name !== undefined && !chartView.editing
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: alarmBanner.visible ? alarmBanner.height + 20 : 12
+                width: Math.min(parent.width - 40, checkRow.implicitWidth + 20)
+                height: checkRow.implicitHeight + 16
+                radius: 6
+                color: !c.available || c.noDataPercent > 2 ? "#6a5000" : c.ok ? "#145a32" : "#8a1010"
+                border.color: "white"
+                RowLayout {
+                    id: checkRow
+                    anchors.centerIn: parent
+                    width: parent.width - 20
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: "white"
+                        font.pixelSize: 16
+                        text: {
+                            const c = parent.parent.c;
+                            if (c.name === undefined) return "";
+                            if (!c.available) return c.name + ": keine Tiefenkarte geladen – Prüfung nicht möglich";
+                            let t = c.name + ": ";
+                            t += c.ok ? "keine Stelle flacher als " + settings.depthText(c.safety)
+                                      : c.shallowLegs + " Abschnitt(e) flacher als " + settings.depthText(c.safety)
+                                        + " (min. " + settings.depthText(c.minDepth) + ", rot markiert)";
+                            if (c.noDataPercent > 2) t += " · " + Math.round(c.noDataPercent) + " % ohne Tiefendaten (Land oder außerhalb der Tiefenkarte) – selbst prüfen!";
+                            return t;
+                        }
+                    }
+                    TouchButton { text: "✕"; implicitHeight: 44; onClicked: routes.clearCheck() }
+                }
+            }
+
             // Route editor bar (above the guidance strip when both are shown)
             Rectangle {
                 visible: chartView.editing
@@ -79,17 +121,21 @@ Window {
                 RowLayout {
                     id: editRow
                     anchors.centerIn: parent
-                    Text { text: "Neue Route: " + chartView.editPoints.length + " Punkte – Karte antippen"; color: Theme.text; font.pixelSize: 17 }
+                    Text {
+                        text: (chartView.editRouteIndex >= 0 ? "Route bearbeiten: " : "Neue Route: ") + chartView.editPoints.length + " Punkte"
+                        color: Theme.text; font.pixelSize: 17
+                    }
                     TouchButton { text: "↶"; implicitHeight: 46; enabled: chartView.editPoints.length > 0; onClicked: chartView.editPoints = chartView.editPoints.slice(0, -1) }
                     TouchButton {
                         text: "Speichern"; fontSize: 15; implicitHeight: 46
-                        onClicked: { routes.addRoute(chartView.editPoints); chartView.editing = false; chartView.editPoints = []; }
+                        enabled: chartView.editPoints.length >= 2
+                        onClicked: { window.saveEditedRoute(); chartView.editing = false; chartView.editPoints = []; }
                     }
                     TouchButton {
                         text: "Speichern & Start"; fontSize: 15; implicitHeight: 46
+                        enabled: chartView.editPoints.length >= 2
                         onClicked: {
-                            routes.addRoute(chartView.editPoints);
-                            if (chartView.editPoints.length >= 2) routes.startRoute(routes.routes.length - 1, false);
+                            routes.startRoute(window.saveEditedRoute(), false);
                             chartView.editing = false;
                             chartView.editPoints = [];
                         }
@@ -145,7 +191,13 @@ Window {
                 // keep the close button clear of the alarm banner
                 anchors.topMargin: alarmBanner.visible ? alarmBanner.height + 28 : 30
                 onCloseRequested: visible = false
-                onNewRoute: { visible = false; chartView.editPoints = []; chartView.editing = true; }
+                onNewRoute: { visible = false; chartView.editRouteIndex = -1; chartView.editPoints = []; chartView.editing = true; }
+                onEditRoute: index => {
+                    visible = false;
+                    chartView.editRouteIndex = index;
+                    chartView.editPoints = routes.routes[index].points.map(p => ({ lat: p.lat, lon: p.lon, name: p.name }));
+                    chartView.editing = true;
+                }
             }
 
             AisPage {

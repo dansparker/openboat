@@ -19,7 +19,8 @@ Item {
     property real vectorMinutes: 6  // length of the COG prediction vector
     property var waypoints: []      // saved waypoints [{name, lat, lon}]
     property var editPoints: []     // route being edited [{lat, lon}]
-    property bool editing: false    // route edit mode: taps add points
+    property bool editing: false    // route edit mode: tap appends, (+) inserts, drag moves, hold deletes
+    property int editRouteIndex: -1  // route being changed, -1 = new route
 
     signal longPressed(real lat, real lon, real x, real y)
     signal tapped(real lat, real lon)
@@ -84,6 +85,31 @@ Item {
         centerY = worldY(lat);
         overlay.requestPaint();
     }
+    // ---- Route editing (unrotated chart pixels) ----
+    function legMid(i) {
+        const a = editPoints[i], b = editPoints[i + 1];
+        return { x: (screenX(a.lon) + screenX(b.lon)) / 2, y: (screenY(a.lat) + screenY(b.lat)) / 2 };
+    }
+    // Index of the edit point / leg handle under an unrotated chart pixel, else -1
+    function editPointAt(x, y) {
+        for (let i = editPoints.length - 1; i >= 0; --i) {
+            if (Math.hypot(screenX(editPoints[i].lon) - x, screenY(editPoints[i].lat) - y) < 24) return i;
+        }
+        return -1;
+    }
+    function editLegAt(x, y) {
+        for (let i = 0; i + 1 < editPoints.length; ++i) {
+            const m = legMid(i);
+            if (Math.hypot(m.x - x, m.y - y) < 22) return i;
+        }
+        return -1;
+    }
+    function setEditPoint(i, lat, lon) {
+        const pts = editPoints.slice();
+        pts[i] = { lat: lat, lon: lon, name: pts[i].name };
+        editPoints = pts;
+    }
+
     // AIS target within a finger's width of a position (tap), else null
     function aisAt(lat, lon) {
         let best = null, bestD = 30;
@@ -329,10 +355,31 @@ Item {
                 for (let i = 0; i < pts.length; ++i) mark(ctx, pts[i], magenta, pts[i].name);
             }
 
+            // Shallow spots found by the route check
+            for (const m of (routes.routeCheck.marks || [])) {
+                const x = chart.screenX(m.lon), y = chart.screenY(m.lat);
+                ctx.strokeStyle = String(Theme.danger);
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(x - 10, y - 10); ctx.lineTo(x + 10, y + 10);
+                ctx.moveTo(x + 10, y - 10); ctx.lineTo(x - 10, y + 10);
+                ctx.stroke();
+                texts.push({ x: x, y: y, dx: 14, dy: 0, text: settings.depthText(m.depth), font: "bold 15px sans-serif", colour: String(Theme.danger), align: "left" });
+            }
+
             // Route being edited
             const orange = String(Theme.anchor);
             line(ctx, chart.editPoints, orange, 3);
             for (let i = 0; i < chart.editPoints.length; ++i) mark(ctx, chart.editPoints[i], orange, String(i + 1));
+            // Insert handles in the middle of each leg
+            for (let i = 0; i + 1 < chart.editPoints.length; ++i) {
+                const m = chart.legMid(i);
+                ctx.fillStyle = orange;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, 9, 0, 2 * Math.PI);
+                ctx.fill();
+                texts.push({ x: m.x, y: m.y, dx: 0, dy: 0, text: "+", font: "bold 16px sans-serif", colour: "white", align: "center" });
+            }
 
             // Anchor circle
             if (boat.anchorActive) {
@@ -516,11 +563,22 @@ Item {
         property real lastX: 0
         property real lastY: 0
         property bool moved: false
-        onPressed: mouse => { lastX = mouse.x; lastY = mouse.y; moved = false; }
+        property int dragPoint: -1  // route editing: point being moved
+        onPressed: mouse => {
+            lastX = mouse.x; lastY = mouse.y; moved = false;
+            const p = chart.unrotate(mouse.x, mouse.y);
+            dragPoint = chart.editing ? chart.editPointAt(p.x, p.y) : -1;
+        }
         onPositionChanged: mouse => {
             // A tap with a slightly wet finger jitters: only a real drag stops following the boat
             if (!moved && Math.abs(mouse.x - lastX) + Math.abs(mouse.y - lastY) < 12) return;
             moved = true;
+            if (dragPoint >= 0) {
+                const p = chart.unrotate(mouse.x, mouse.y);
+                chart.setEditPoint(dragPoint, chart.latAt(p.y), chart.lonAt(p.x));
+                overlay.requestPaint();
+                return;
+            }
             chart.follow = false;
             const d = chart.rot(mouse.x - lastX, mouse.y - lastY, chart.upDeg);  // screen -> chart direction
             chart.centerX -= d.x;
@@ -532,11 +590,31 @@ Item {
         onClicked: mouse => {
             if (moved) return;
             const p = chart.unrotate(mouse.x, mouse.y);
+            if (chart.editing) {
+                const pts = chart.editPoints.slice();
+                const leg = chart.editLegAt(p.x, p.y);
+                if (chart.editPointAt(p.x, p.y) >= 0) return;  // tap on a point: nothing (drag moves, hold deletes)
+                if (leg >= 0) pts.splice(leg + 1, 0, { lat: chart.latAt(p.y), lon: chart.lonAt(p.x) });
+                else pts.push({ lat: chart.latAt(p.y), lon: chart.lonAt(p.x) });
+                chart.editPoints = pts;
+                overlay.requestPaint();
+                return;
+            }
             chart.tapped(chart.latAt(p.y), chart.lonAt(p.x));
         }
         onPressAndHold: mouse => {
             if (moved) return;
             const p = chart.unrotate(mouse.x, mouse.y);
+            if (chart.editing) {
+                const i = chart.editPointAt(p.x, p.y);
+                if (i >= 0) {
+                    const pts = chart.editPoints.slice();
+                    pts.splice(i, 1);
+                    chart.editPoints = pts;
+                    overlay.requestPaint();
+                }
+                return;
+            }
             chart.longPressed(chart.latAt(p.y), chart.lonAt(p.x), mouse.x, mouse.y);
         }
         onWheel: wheel => { chart.setZoom(chart.zoom + (wheel.angleDelta.y > 0 ? 1 : -1)); overlay.requestPaint(); }

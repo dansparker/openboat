@@ -1,8 +1,14 @@
 #include "route_store.hpp"
 
+#include "depth_chart.hpp"
+
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QStorageInfo>
 #include <QSaveFile>
 #include <QVariantMap>
 #include <QXmlStreamReader>
@@ -41,6 +47,134 @@ bool valid(double lat, double lon) { return lat >= -90 && lat <= 90 && lon >= -1
 
 }  // namespace
 
+namespace {
+
+// A name not used in `list` yet: "Name", "Name (2)", ...
+QString free_name(const QVariantList& list, const QString& name) {
+    const auto used = [&](const QString& n) {
+        return std::any_of(list.begin(), list.end(), [&](const QVariant& v) { return v.toMap().value("name").toString() == n; });
+    };
+    if (!used(name)) return name;
+    for (int i = 2;; ++i) {
+        const QString n = QStringLiteral("%1 (%2)").arg(name).arg(i);
+        if (!used(n)) return n;
+    }
+}
+
+}  // namespace
+
+RouteStore::~RouteStore() = default;
+
+void RouteStore::setDepthChart(const QString& path) {
+    depth_.reset();
+    if (path.isEmpty()) return;
+    auto chart = std::make_unique<DepthChart>(path);
+    if (chart->valid()) depth_ = std::move(chart);
+}
+
+void RouteStore::checkPoints(const QVariantList& points, double safety_m, const QString& name) {
+    if (!depth_) {
+        check_ = QVariantMap{{"available", false}, {"name", name}};
+    } else {
+        check_ = checkRouteDepth(*depth_, points, safety_m);
+        check_["available"] = true;
+        check_["name"] = name;
+        check_["safety"] = safety_m;
+    }
+    emit checkChanged();
+}
+
+void RouteStore::checkRoute(int index, double safety_m) {
+    if (index < 0 || index >= routes_.size()) return;
+    const QVariantMap r = routes_[index].toMap();
+    checkPoints(r.value("points").toList(), safety_m, r.value("name").toString());
+}
+
+void RouteStore::clearCheck() {
+    check_.clear();
+    emit checkChanged();
+}
+
+void RouteStore::setUsbRoots(QStringList roots, QStringList fixedDrives) {
+    usb_roots_ = std::move(roots);
+    usb_fixed_ = std::move(fixedDrives);
+    refreshUsb();
+}
+
+void RouteStore::refreshUsb() {
+    usb_drives_ = usb_fixed_;
+    // A drive is a mount point up to two levels below a root (/media/<user>/<label>)
+    for (const QString& root : usb_roots_) {
+        QDirIterator it(root, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext()) {
+            const QString dir = it.next();
+            if (QDir(root).relativeFilePath(dir).count(QLatin1Char('/')) > 1) continue;
+            const QStorageInfo info(dir);
+            if (info.isValid() && info.isReady() && QDir::cleanPath(info.rootPath()) == QDir::cleanPath(dir) &&
+                !usb_drives_.contains(dir)) {
+                usb_drives_.append(dir);
+            }
+        }
+    }
+    usb_files_.clear();
+    for (const QString& drive : usb_drives_) {
+        // GPX files in the drive and one folder deep (not the whole stick: it may be large)
+        QDirIterator it(drive, {QStringLiteral("*.gpx"), QStringLiteral("*.GPX")}, QDir::Files, QDirIterator::Subdirectories);
+        while (it.hasNext() && usb_files_.size() < 100) {
+            const QString file = it.next();
+            if (QDir(drive).relativeFilePath(file).count(QLatin1Char('/')) > 1) continue;
+            usb_files_.append(QVariantMap{{QStringLiteral("path"), file},
+                                          {QStringLiteral("name"), QDir(drive).relativeFilePath(file)},
+                                          {QStringLiteral("drive"), QFileInfo(drive).fileName()}});
+        }
+    }
+    emit usbChanged();
+}
+
+bool RouteStore::importGpx(const QString& path) {
+    QVariantList wpts, rtes;
+    QString error;
+    if (!readGpx(path, wpts, rtes, error)) {
+        usb_message_ = QStringLiteral("Import fehlgeschlagen: %1").arg(error);
+        emit usbChanged();
+        return false;
+    }
+    for (const QVariant& w : wpts) {
+        QVariantMap m = w.toMap();
+        m["name"] = free_name(waypoints_, m.value("name").toString());
+        waypoints_.append(m);
+    }
+    for (const QVariant& r : rtes) {
+        QVariantMap m = r.toMap();
+        m["name"] = free_name(routes_, m.value("name").toString());
+        routes_.append(m);
+    }
+    save();
+    usb_message_ = QStringLiteral("%1: %2 Wegpunkte, %3 Routen importiert")
+                       .arg(QFileInfo(path).fileName()).arg(wpts.size()).arg(rtes.size());
+    emit usbChanged();
+    return true;
+}
+
+bool RouteStore::exportToUsb() {
+    refreshUsb();
+    if (usb_drives_.isEmpty()) {
+        usb_message_ = QStringLiteral("Kein USB-Stick gefunden");
+        emit usbChanged();
+        return false;
+    }
+    const QString file = QDir(usb_drives_.first())
+                             .filePath(QStringLiteral("OpenBoat-%1.gpx")
+                                           .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmm"))));
+    QString error;
+    const bool ok = writeGpx(file, waypoints_, routes_, error);
+    usb_message_ = ok ? QStringLiteral("Gespeichert: %1 (%2 Wegpunkte, %3 Routen)")
+                            .arg(file).arg(waypoints_.size()).arg(routes_.size())
+                      : QStringLiteral("Export fehlgeschlagen: %1").arg(error);
+    refreshUsb();
+    return ok;
+}
+
 RouteStore::RouteStore(boat::core::DataBus& bus, QString path, QObject* parent)
     : QObject(parent), bus_(bus), path_(std::move(path)) {
     if (QFileInfo::exists(path_)) readGpx(path_, waypoints_, routes_, error_);
@@ -70,16 +204,32 @@ void RouteStore::removeWaypoint(int index) {
     save();
 }
 
-void RouteStore::addRoute(const QVariantList& points, const QString& name) {
-    if (points.size() < 2) return;
+namespace {
+
+QVariantList named_points(const QVariantList& points) {
     QVariantList named;
     for (qsizetype i = 0; i < points.size(); ++i) {
         QVariantMap p = points[i].toMap();
         if (p.value("name").toString().isEmpty()) p["name"] = QStringLiteral("RP%1").arg(i + 1);
-        named.append(p);
+        named.append(point(p.value("name").toString(), p.value("lat").toDouble(), p.value("lon").toDouble()));
     }
-    routes_.append(make_route(name.isEmpty() ? uniqueName(QStringLiteral("Route ")) : name, named));
+    return named;
+}
+
+}  // namespace
+
+int RouteStore::addRoute(const QVariantList& points, const QString& name) {
+    if (points.size() < 2) return -1;
+    routes_.append(make_route(name.isEmpty() ? uniqueName(QStringLiteral("Route ")) : name, named_points(points)));
     save();
+    return static_cast<int>(routes_.size() - 1);
+}
+
+bool RouteStore::updateRoute(int index, const QVariantList& points) {
+    if (index < 0 || index >= routes_.size() || points.size() < 2) return false;
+    routes_[index] = make_route(routes_[index].toMap().value("name").toString(), named_points(points));
+    save();
+    return true;
 }
 
 void RouteStore::removeRoute(int index) {

@@ -220,6 +220,13 @@ int main(int argc, char* argv[]) {
     BoatModel model(bus);
     AlarmSound sound(bus);
     RouteStore routes(bus, resolve(base_dir, config.value("navigation_file").toString("navigation.gpx")));
+    {
+        QStringList roots{QStringLiteral("/media"), QStringLiteral("/run/media"), QStringLiteral("/mnt")};
+        if (config.contains("usb_roots")) roots = config.value("usb_roots").toVariant().toStringList();
+        QStringList fixed;
+        for (const auto& d : config.value("usb_drives").toArray()) fixed.append(resolve(base_dir, d.toString()));
+        routes.setUsbRoots(roots, fixed);
+    }
     if (!AlarmSound::available() && !config.contains("buzzer")) {
         qWarning() << "OpenBoat: NO AUDIBLE ALARM - built without Qt Multimedia and no GPIO buzzer configured";
     }
@@ -228,12 +235,17 @@ int main(int argc, char* argv[]) {
     QQmlApplicationEngine engine;
     QVariantList layers;
     int index = 0;
+    bool depth_chart_set = false;
     for (const auto& value : config.value("charts").toArray()) {
         const QString path = resolve(base_dir, value.toString());
         const auto info = MbTilesProvider::inspect(path);
         if (!info.valid) {
             qWarning() << "OpenBoat: chart not loaded:" << info.error;
             continue;
+        }
+        if (info.depth_encoded && !depth_chart_set) {
+            routes.setDepthChart(path);  // route check against the safety depth
+            depth_chart_set = true;
         }
         const QString id = QStringLiteral("chart%1").arg(index++);
         engine.addImageProvider(id, new MbTilesProvider(path, info.depth_encoded));
