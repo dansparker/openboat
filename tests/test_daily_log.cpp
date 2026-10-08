@@ -32,7 +32,8 @@ TEST(DailyLog, TaggedLinesAreParsed) {
 
 TEST(DailyLog, OneFilePerDayWithCap) {
     const auto dir = std::filesystem::temp_directory_path() / "openboat-dailylog-test";
-    std::filesystem::remove_all(dir);
+    std::error_code ec0;
+    std::filesystem::remove_all(dir, ec0);
     {
         core::DailyLog log(dir, "nmea0183-test", "nmea", 60);
         EXPECT_TRUE(log.write("line one", core::unix_ms(2026, 10, 8, 23, 59, 0)));
@@ -41,9 +42,12 @@ TEST(DailyLog, OneFilePerDayWithCap) {
         EXPECT_TRUE(log.write(std::string(40, 'x'), core::unix_ms(2026, 10, 9, 0, 2, 0)));
         EXPECT_FALSE(log.write(std::string(40, 'y'), core::unix_ms(2026, 10, 9, 0, 3, 0)));  // over 60 bytes
     }
-    std::ifstream in(dir / "nmea0183-test-2026-10-08.nmea");
-    std::stringstream text;
-    text << in.rdbuf();
-    EXPECT_EQ(text.str(), "line one\n");
-    std::filesystem::remove_all(dir);
+    {
+        std::ifstream in(dir / "nmea0183-test-2026-10-08.nmea");  // closed before removing (Windows)
+        std::stringstream text;
+        text << in.rdbuf();
+        EXPECT_EQ(text.str(), "line one\n");
+    }
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }
