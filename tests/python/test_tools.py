@@ -106,6 +106,15 @@ def test_light_characteristic():
     assert make_enc.mark_from_feature("LIGHTS", {"SECTR1": "90"}, 9.0, 47.0)["sector"] is None
 
 
+def test_sector_light_gets_one_combined_label():
+    sectors = [make_enc.mark_from_feature("LIGHTS", {"SECTR1": a, "SECTR2": b, "COLOUR": c, "LITCHR": "8",
+                                                     "SIGPER": 4, "VALNMR": r}, 9.0, 47.0)
+               for a, b, c, r in ((200, 250, "3", 3), (250, 260, "1", 4), (260, 310, "4", 3))]
+    labels = make_enc.labels_sidecar([], sectors, 15, 15)
+    lights = [l for l in labels if l["kind"] == "light"]
+    assert [l["text"] for l in lights] == ["Oc WRG 4s 4M"]
+
+
 def test_light_sector_shines_away_from_seaward_bearing():
     # SECTR 90..180 (bearings from seaward) -> the light shines towards 270..360: the arc
     # lies up-left of the light, nothing down-right

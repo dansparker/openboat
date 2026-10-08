@@ -22,6 +22,11 @@ funktional angelehnt an Geräte wie den Garmin GPSMAP 9000xsv. Schwesterprojekt 
 ![OpenBoat – Kurs oben](docs/screenshots/courseup.png)
 </details>
 
+<details><summary>ENC: Feuersektoren, Brücke zu niedrig für 12 m Mast (synthetische Testdaten)</summary>
+
+![OpenBoat – ENC mit Sektorenfeuer und Durchfahrtshöhe](docs/screenshots/enc.png)
+</details>
+
 <details><summary>AIS-Zielliste</summary>
 
 ![OpenBoat – AIS-Zielliste](docs/screenshots/ais.png)

@@ -116,6 +116,23 @@ def light_characteristic(props):
     return " ".join(p for p in parts if p)
 
 
+def combined_characteristic(lights):
+    """One label per light position, as on paper charts: the sectors of one light
+    share character and period, their colours are listed together (Oc WRG 4s 4M)."""
+    first = lights[0]["props"]
+    colours = []
+    for m in lights:
+        for c in int_list(m["props"].get("COLOUR")):
+            if c not in colours:
+                colours.append(c)
+    order = {1: 0, 3: 1, 4: 2}  # W R G first, like the charts
+    colours.sort(key=lambda c: order.get(c, 9))
+    ranges = [number(m["props"].get("VALNMR")) for m in lights]
+    ranges = [r for r in ranges if r is not None]
+    props = dict(first, COLOUR=",".join(str(c) for c in colours), VALNMR=max(ranges) if ranges else None)
+    return light_characteristic(props)
+
+
 def mark_from_feature(layer, props, lon, lat):
     """Feature attributes -> mark dict for rendering (pure, unit tested)."""
     kind = "light" if layer == "LIGHTS" else "buoy" if layer in BUOYS else "beacon"
@@ -128,7 +145,8 @@ def mark_from_feature(layer, props, lon, lat):
     if kind == "light":
         s1, s2 = number(props.get("SECTR1")), number(props.get("SECTR2"))
         extra = {"sector": (s1, s2) if s1 is not None and s2 is not None else None,
-                 "character": light_characteristic(props)}
+                 "character": light_characteristic(props),
+                 "props": {k: props.get(k) for k in ("LITCHR", "SIGGRP", "COLOUR", "SIGPER", "HEIGHT", "VALNMR")}}
     return {**extra,
         "kind": kind,
         "class": layer,
@@ -339,7 +357,11 @@ def labels_sidecar(soundings, marks, zmin, zmax, clearances=()):
             items += [(lon, lat, f"{d:g}", "depth") for lon, lat, d in soundings]
         if z >= 15:
             items += [(m["lon"], m["lat"], m["name"], "place") for m in marks if m["name"]]
-            items += [(m["lon"], m["lat"], m["character"], "light") for m in marks if m.get("character")]
+            groups = {}
+            for m in marks:
+                if m.get("character"):
+                    groups.setdefault((round(m["lon"], 6), round(m["lat"], 6)), []).append(m)
+            items += [(g[0]["lon"], g[0]["lat"], combined_characteristic(g), "light") for g in groups.values()]
         for lon, lat, text, kind in place_labels(items, z, 40):
             merged.setdefault((round(lon, 6), round(lat, 6), text, kind), []).append(z)
     out = []
