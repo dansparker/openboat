@@ -21,6 +21,7 @@ public:
     explicit Reader(std::span<const std::uint8_t> d) : d_(d) {}
 
     [[nodiscard]] std::uint8_t u8(std::size_t at) const { return at < d_.size() ? d_[at] : 0xFF; }
+    [[nodiscard]] bool has(std::size_t at) const { return at < d_.size(); }
 
     [[nodiscard]] std::optional<std::uint32_t> u16(std::size_t at) const {
         const auto v = raw(at, 2);
@@ -255,9 +256,9 @@ bool Decoder::decode(const Message& m) {
             a.cog_deg = angle_deg(r.u16(14));
             if (const auto sog = r.u16(16)) a.sog_mps = *sog * 0.01;
             a.heading_deg = angle_deg(r.u16(21));
-            if (!a.class_b) {
-                if (const auto st = r.u8(25)) a.nav_status = static_cast<std::uint8_t>(*st & 0x0F);
-            }
+            // Only if present: a truncated message must not read as 15 ("test"),
+            // which would silence a real AIS-SART
+            if (!a.class_b && r.has(25)) a.nav_status = static_cast<std::uint8_t>(r.u8(25) & 0x0F);
             bus_.publish(a);
             return true;
         }
