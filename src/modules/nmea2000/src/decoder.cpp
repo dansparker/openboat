@@ -1,6 +1,8 @@
 #include "boat/nmea2000/decoder.hpp"
 
+#include <algorithm>
 #include <numbers>
+#include <string>
 
 #include "boat/core/heading.hpp"
 #include "boat/core/marine_data.hpp"
@@ -22,6 +24,14 @@ public:
 
     [[nodiscard]] std::uint8_t u8(std::size_t at) const { return at < d_.size() ? d_[at] : 0xFF; }
     [[nodiscard]] bool has(std::size_t at) const { return at < d_.size(); }
+    // STRING_LAU: length byte (incl. the two header bytes), encoding (1 = ASCII), text
+    [[nodiscard]] std::optional<std::string> text_lau(std::size_t at) const {
+        if (at + 2 > d_.size() || d_[at] < 2 || d_[at + 1] != 1) return std::nullopt;
+        const std::size_t end = std::min<std::size_t>(d_.size(), at + d_[at]);
+        std::string s(d_.begin() + static_cast<std::ptrdiff_t>(at + 2), d_.begin() + static_cast<std::ptrdiff_t>(end));
+        while (!s.empty() && (s.back() == ' ' || s.back() == '@' || s.back() == 0 || static_cast<unsigned char>(s.back()) == 0xFF)) s.pop_back();
+        return s;
+    }
 
     [[nodiscard]] std::optional<std::uint32_t> u16(std::size_t at) const {
         const auto v = raw(at, 2);
@@ -90,9 +100,9 @@ CanId parse_can_id(std::uint32_t id) {
 bool is_fast_packet(std::uint32_t pgn) {
     switch (pgn) {
         case 126208: case 126464: case 126996: case 127489: case 128275:
-        case 129029: case 129038: case 129039: case 129040: case 129284:
+        case 129029: case 129038: case 129039: case 129040: case 129041: case 129284:
         case 129285: case 129540: case 129794: case 129809: case 129810:
-        case 130074:
+        case 129793: case 129802: case 130074:
             return true;
         default:
             return false;
@@ -260,6 +270,40 @@ bool Decoder::decode(const Message& m) {
             // which would silence a real AIS-SART
             if (!a.class_b && r.has(25)) a.nav_status = static_cast<std::uint8_t>(r.u8(25) & 0x0F);
             bus_.publish(a);
+            return true;
+        }
+        case 129793: {  // AIS UTC and date report (base station)
+            core::AisReport a;
+            a.station = core::AisStation::BaseStation;
+            a.mmsi = r.u32(1).value_or(0);
+            if (a.mmsi == 0) return false;
+            a.position = lat_lon(r, 9, 5);
+            bus_.publish(a);
+            return true;
+        }
+        case 129041: {  // AIS aids to navigation report
+            core::AisReport a;
+            a.station = core::AisStation::AtoN;
+            a.mmsi = r.u32(1).value_or(0);
+            if (a.mmsi == 0 || !r.has(22)) return false;
+            a.position = lat_lon(r, 9, 5);
+            if (const auto len = r.u16(14)) a.length_m = *len * 0.1;
+            if (const auto beam = r.u16(16)) a.beam_m = *beam * 0.1;
+            const std::uint8_t flags = r.u8(22);
+            a.aton_type = static_cast<std::uint8_t>(flags & 0x1F);
+            a.off_position = (flags & 0x20) != 0;
+            a.virtual_aton = (flags & 0x40) != 0;
+            if (auto name = r.text_lau(26); name && !name->empty()) a.name = std::move(*name);
+            bus_.publish(a);
+            return true;
+        }
+        case 129802: {  // AIS safety related broadcast message (129801, addressed: not decoded)
+            core::AisSafetyMessage s;
+            s.mmsi = r.u32(1).value_or(0) & 0x3FFFFFFF;  // 30 bit + 2 reserved
+            auto text = r.text_lau(6);                    // after the transceiver byte
+            if (s.mmsi == 0 || !text || text->empty()) return false;
+            s.text = std::move(*text);
+            bus_.publish(s);
             return true;
         }
         default:

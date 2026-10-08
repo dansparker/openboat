@@ -48,6 +48,8 @@ class BoatModel : public QObject {
     Q_PROPERTY(double anchorRadius READ anchorRadius NOTIFY changed)
     Q_PROPERTY(double anchorDistance READ anchorDistance NOTIFY changed)
     Q_PROPERTY(QVariantList aisTargets READ aisTargets NOTIFY changed)
+    // AIS safety messages, newest first: [{mmsi, sender, text, kind, ageMin, addressed}]
+    Q_PROPERTY(QVariantList aisMessages READ aisMessages NOTIFY changed)
     // Active waypoint navigation: { active, mode ("goto"|"route"|"mob"), target, routeName, leg, legs,
     //   dtwNm, btw, xteNm, ttgMin, remainingNm, arrived, from: {lat, lon} | null, points: [{name, lat, lon}] }
     // Values are -1 when unknown (no fix).
@@ -96,6 +98,7 @@ public:
     double anchorRadius() const { return anchor_radius_; }
     double anchorDistance() const { return anchor_distance_; }
     QVariantList aisTargets() const { return ais_; }
+    QVariantList aisMessages() const { return ais_messages_; }
     QVariantMap guidance() const { return guidance_; }
     QVariantList track() const { return track_; }
     bool trackRecording() const { return track_recording_; }
@@ -143,6 +146,7 @@ private:
     bool anchor_active_ = false;
     double anchor_lat_ = 0.0, anchor_lon_ = 0.0, anchor_radius_ = 0.0, anchor_distance_ = 0.0;
     QVariantList ais_;
+    QVariantList ais_messages_;
     QVariantMap guidance_;
     QVariantList track_;
     std::uint64_t track_version_ = 0;

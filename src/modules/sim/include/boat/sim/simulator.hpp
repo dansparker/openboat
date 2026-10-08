@@ -23,6 +23,7 @@ struct SimState {
     core::AisReport ais;
     core::AisReport anchored;  // sailing boat at anchor (class B)
     core::AisReport beacon;    // MOB device in TEST mode: listed, no alarm
+    core::AisReport aton;      // virtual aid to navigation (isolated danger)
 };
 
 struct SimSettings {

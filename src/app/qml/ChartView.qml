@@ -351,6 +351,26 @@ Item {
             // AIS targets: triangle + COG vector
             for (const t of boat.aisTargets) {
                 const x = chart.screenX(t.lon), y = chart.screenY(t.lat);
+                if (t.station !== "vessel") {
+                    // Aid to navigation: diamond (virtual: dashed, only a radio signal, no
+                    // real mark!); base station: square. Drifted buoy: red with a cross.
+                    const c = t.offPosition ? String(Theme.danger) : t.lost ? String(Theme.aisLost) : String(Theme.route);
+                    ctx.strokeStyle = c;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash(t.virtualAton ? [4, 3] : []);
+                    ctx.beginPath();
+                    if (t.station === "aton") {
+                        ctx.moveTo(x, y - 10); ctx.lineTo(x + 8, y); ctx.lineTo(x, y + 10); ctx.lineTo(x - 8, y); ctx.closePath();
+                    } else {
+                        ctx.rect(x - 7, y - 7, 14, 14);
+                    }
+                    if (t.offPosition) { ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6); }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    const label = t.station === "base" ? "AIS-Basis" : (t.virtualAton ? "V-AIS " : "") + (t.name || "AIS-Seezeichen");
+                    texts.push({ x: x, y: y, dx: 12, dy: 0, text: label, font: "12px sans-serif", colour: c, align: "left" });
+                    continue;
+                }
                 if (t.kind !== "vessel") {
                     // Emergency beacon (S-52 style): red circle with a cross
                     const c = t.beaconTest ? String(Theme.aisLost) : String(Theme.danger);

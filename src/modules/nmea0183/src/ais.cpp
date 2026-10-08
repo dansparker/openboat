@@ -1,5 +1,6 @@
 #include "boat/nmea0183/ais.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include "boat/core/nav_math.hpp"
@@ -93,11 +94,10 @@ void set_text(std::optional<std::string>& field, std::string value) {
 
 }  // namespace
 
-std::optional<core::AisReport> AisDecoder::decode_payload(std::string_view payload, int fill_bits) {
-    const Bits b(payload, fill_bits);
-    if (b.size() < 38) return std::nullopt;
+namespace {
+
+std::optional<core::AisReport> decode_report(const Bits& b, std::uint32_t type) {
     core::AisReport r;
-    const std::uint32_t type = b.u(0, 6);
     r.mmsi = b.u(8, 30);
     switch (type) {
         case 1:
@@ -108,6 +108,26 @@ std::optional<core::AisReport> AisDecoder::decode_payload(std::string_view paylo
             position(r, b, 61, 89);
             motion(r, b, 50, 116, 128);
             return r;
+        case 4:
+            if (b.size() < 168) return std::nullopt;
+            r.station = core::AisStation::BaseStation;
+            position(r, b, 79, 107);
+            return r;
+        case 21: {
+            if (b.size() < 272) return std::nullopt;
+            r.station = core::AisStation::AtoN;
+            r.aton_type = static_cast<std::uint8_t>(b.u(38, 5));
+            std::string name = b.text(43, 20);
+            // Name extension: up to 14 more characters after bit 272
+            if (b.size() >= 278) name += b.text(272, std::min<std::size_t>(14, (b.size() - 272) / 6));
+            while (!name.empty() && (name.back() == '@' || name.back() == ' ')) name.pop_back();
+            set_text(r.name, std::move(name));
+            position(r, b, 164, 192);
+            dimensions(r, b, 219);
+            r.off_position = b.u(259, 1) == 1;
+            r.virtual_aton = b.u(269, 1) == 1;
+            return r;
+        }
         case 5:
             if (b.size() < 420) return std::nullopt;
             set_text(r.callsign, b.text(70, 7));
@@ -147,10 +167,32 @@ std::optional<core::AisReport> AisDecoder::decode_payload(std::string_view paylo
     }
 }
 
-std::optional<core::AisReport> AisDecoder::feed(int fragment_count, int fragment_number,
+}  // namespace
+
+std::optional<AisMessage> AisDecoder::decode_message(std::string_view payload, int fill_bits) {
+    const Bits b(payload, fill_bits);
+    if (b.size() < 38) return std::nullopt;
+    const std::uint32_t type = b.u(0, 6);
+    if (type == 12 || type == 14) {
+        // Safety related text: 6-bit characters after the header (12: after the destination)
+        const std::size_t start = type == 12 ? 72 : 40;
+        if (b.size() < start + 6) return std::nullopt;
+        core::AisSafetyMessage m;
+        m.mmsi = b.u(8, 30);
+        m.addressed = type == 12;
+        m.text = b.text(start, (b.size() - start) / 6);
+        if (m.text.empty()) return std::nullopt;
+        return AisMessage{std::nullopt, std::move(m)};
+    }
+    auto r = decode_report(b, type);
+    if (!r) return std::nullopt;
+    return AisMessage{std::move(r), std::nullopt};
+}
+
+std::optional<AisMessage> AisDecoder::feed(int fragment_count, int fragment_number,
                                                 std::string_view sequence_id, char channel,
                                                 std::string_view payload, int fill_bits) {
-    if (fragment_count <= 1) return decode_payload(payload, fill_bits);
+    if (fragment_count <= 1) return decode_message(payload, fill_bits);
 
     const auto now = std::chrono::steady_clock::now();
     // Drop fragments that never completed (lost sentence)
@@ -173,7 +215,7 @@ std::optional<core::AisReport> AisDecoder::feed(int fragment_count, int fragment
     if (fragment_number < fragment_count) return std::nullopt;
     const std::string full = std::move(it->second.payload);
     pending_.erase(it);
-    return decode_payload(full, fill_bits);
+    return decode_message(full, fill_bits);
 }
 
 }  // namespace boat::nmea0183

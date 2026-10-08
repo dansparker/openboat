@@ -33,6 +33,14 @@ void AisTable::update(const core::AisReport& r, Clock::time_point now) {
     core::AisReport& d = t.data;
     d.mmsi = r.mmsi;
     t.kind = ais_kind(r.mmsi);
+    if (r.station != core::AisStation::Vessel) {
+        d.station = r.station;
+        if (r.station == core::AisStation::AtoN) {
+            d.aton_type = r.aton_type;
+            d.virtual_aton = r.virtual_aton;
+            d.off_position = r.off_position;
+        }
+    }
     if (r.nav_status) {
         d.nav_status = r.nav_status;
         t.beacon_test = t.kind != AisKind::Vessel && *r.nav_status == 15;
@@ -53,18 +61,36 @@ void AisTable::update(const core::AisReport& r, Clock::time_point now) {
     if (r.ship_type != 0) d.ship_type = r.ship_type;
 }
 
+void AisTable::message(const core::AisSafetyMessage& m, Clock::time_point now) {
+    // The same text is repeated by the sender: keep one entry, refreshed
+    std::erase_if(messages_, [&](const auto& e) { return e.first.mmsi == m.mmsi && e.first.text == m.text; });
+    messages_.emplace_back(m, now);
+    if (messages_.size() > 50) messages_.erase(messages_.begin());
+}
+
 AisTargetList AisTable::evaluate(const std::optional<core::Position>& own,
                                  const std::optional<core::CourseOverGround>& cog, Clock::time_point now) {
     AisTargetList list;
+    std::erase_if(messages_, [&](const auto& e) { return seconds(now - e.second) > 3600.0; });
+    for (auto it = messages_.rbegin(); it != messages_.rend(); ++it) {
+        AisSafetyEntry e;
+        e.message = it->first;
+        e.kind = ais_kind(it->first.mmsi);
+        e.age_s = seconds(now - it->second);
+        const auto t = targets_.find(it->first.mmsi);
+        e.sender = t != targets_.end() && t->second.data.name ? *t->second.data.name : std::to_string(it->first.mmsi);
+        list.messages.push_back(std::move(e));
+    }
     for (auto it = targets_.begin(); it != targets_.end();) {
         AisTarget& t = it->second;
         const double age = seconds(now - t.last_position);
-        if (!t.data.position || age > settings_.remove_after_s) {
+        const bool station = t.data.station != core::AisStation::Vessel;
+        if (!t.data.position || age > (station ? settings_.station_remove_after_s : settings_.remove_after_s)) {
             // Static data alone (no position yet) is kept, but not listed
             it = t.data.position ? targets_.erase(it) : std::next(it);
             continue;
         }
-        t.lost = age > settings_.lost_after_s;
+        t.lost = age > (station ? settings_.station_lost_after_s : settings_.lost_after_s);
         t.range_m.reset();
         t.bearing_deg.reset();
         t.cpa_m.reset();
@@ -73,7 +99,7 @@ AisTargetList AisTable::evaluate(const std::optional<core::Position>& own,
         if (own) {
             t.range_m = core::distance_m(own->point, *t.data.position);
             t.bearing_deg = core::initial_bearing_deg(own->point, *t.data.position);
-            if (!t.lost && t.data.cog_deg && t.data.sog_mps) {
+            if (!station && !t.lost && t.data.cog_deg && t.data.sog_mps) {
                 const double own_cog = cog ? cog->cog_deg : 0.0;
                 const double own_sog = cog ? cog->sog_mps : 0.0;
                 // Dead-reckon the target to "now": its report may be minutes old
@@ -94,7 +120,9 @@ AisTargetList AisTable::evaluate(const std::optional<core::Position>& own,
     }
     // Emergency beacons first, then collision danger, then by range
     const auto rank = [](const AisTarget& t) {
-        return t.kind != AisKind::Vessel && !t.beacon_test ? 0 : t.dangerous ? 1 : 2;
+        if (t.kind != AisKind::Vessel && !t.beacon_test) return 0;
+        if (t.dangerous) return 1;
+        return t.data.station == core::AisStation::Vessel ? 2 : 3;  // fixed stations last
     };
     std::sort(list.targets.begin(), list.targets.end(), [&](const AisTarget& a, const AisTarget& b) {
         if (rank(a) != rank(b)) return rank(a) < rank(b);
@@ -172,11 +200,26 @@ AlarmList AlarmEvaluator::evaluate(const std::optional<core::Sample<core::Positi
             out.active.push_back({AlarmId::AisBeacon, s.str(), t.data.mmsi});
             continue;
         }
+        // A drifted buoy nearby: its charted position is wrong
+        if (t.data.station == core::AisStation::AtoN && t.data.off_position && !t.lost && t.range_m &&
+            *t.range_m <= settings_.off_position_warning_m) {
+            out.active.push_back({AlarmId::AtonOffPosition,
+                                  "Seezeichen nicht auf Position: " + (t.data.name ? *t.data.name : std::to_string(t.data.mmsi)),
+                                  t.data.mmsi, AlarmLevel::Warning});
+        }
         if (!t.dangerous) continue;
         std::ostringstream s;
         s << "AIS-Kollisionsgefahr: " << (t.data.name ? *t.data.name : std::to_string(t.data.mmsi));
         if (t.tcpa_s) s << " in " << static_cast<int>(*t.tcpa_s / 60.0) << " min";
         out.active.push_back({AlarmId::AisCollision, s.str(), t.data.mmsi});
+    }
+    // Safety messages: from an emergency beacon an alarm, otherwise a warning;
+    // test transmissions ("SART TEST", "MOB TEST") are only listed
+    for (const auto& m : ais.messages) {
+        if (m.age_s > settings_.message_alarm_s || m.message.text.find("TEST") != std::string::npos) continue;
+        const bool beacon = m.kind != AisKind::Vessel;
+        out.active.push_back({AlarmId::AisMessage, "AIS-Meldung von " + m.sender + ": " + m.message.text, m.message.mmsi,
+                              beacon ? AlarmLevel::Alarm : AlarmLevel::Warning});
     }
     out.active.insert(out.active.end(), extra.begin(), extra.end());
     return finish(std::move(out));
@@ -263,9 +306,14 @@ void NavModule::start(core::DataBus& bus) {
         std::optional<NavSettings> new_settings;
         std::optional<core::GeoPoint> variation_point;
         Clock::time_point variation_time{};
+        std::vector<core::AisSafetyMessage> safety;
         const auto ais_sub = bus.topic<core::AisReport>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
             reports.push_back(s.value);
+        });
+        const auto safety_sub = bus.topic<core::AisSafetyMessage>().subscribe([&](const auto& s) {
+            std::scoped_lock lock(mutex);
+            safety.push_back(s.value);
         });
         const auto anchor_sub = bus.topic<AnchorCommand>().subscribe([&](const auto& s) {
             std::scoped_lock lock(mutex);
@@ -296,6 +344,8 @@ void NavModule::start(core::DataBus& bus) {
             {
                 std::scoped_lock lock(mutex);
                 for (const auto& r : reports) ais.update(r, now);
+                for (const auto& m : safety) ais.message(m, now);
+                safety.clear();
                 for (const auto& c : commands) alarms.command(c, own);
                 if (new_settings) {
                     ais.set_settings(new_settings->ais);
@@ -339,6 +389,7 @@ void NavModule::start(core::DataBus& bus) {
             for (int i = 0; running_ && i < 10; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         bus.topic<core::AisReport>().unsubscribe(ais_sub);
+        bus.topic<core::AisSafetyMessage>().unsubscribe(safety_sub);
         bus.topic<AnchorCommand>().unsubscribe(anchor_sub);
         bus.topic<AlarmAcknowledge>().unsubscribe(ack_sub);
         bus.topic<NavCommand>().unsubscribe(nav_sub);

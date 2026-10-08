@@ -118,8 +118,13 @@ struct EngineData {
 
 // One AIS target (decoded from AIVDM or NMEA 2000 PGN 129038/129039/129794).
 // Published per received message; the AisTargets module keeps the list.
+// What sends an AIS report: a ship, a base station (message 4, PGN 129793)
+// or an aid to navigation (message 21, PGN 129041).
+enum class AisStation : std::uint8_t { Vessel, BaseStation, AtoN };
+
 struct AisReport {
     std::uint32_t mmsi = 0;
+    AisStation station = AisStation::Vessel;
     std::optional<GeoPoint> position;
     std::optional<double> cog_deg;
     std::optional<double> sog_mps;
@@ -133,6 +138,19 @@ struct AisReport {
     // 15 = undefined (also used by SART/MOB devices in test mode)
     std::optional<std::uint8_t> nav_status;
     bool class_b = false;
+    // Aids to navigation: type 1..31 (ITU-R M.1371 table 74), virtual = only a
+    // radio signal, no physical mark; off_position = the buoy has drifted
+    std::uint8_t aton_type = 0;
+    bool virtual_aton = false;
+    bool off_position = false;
+};
+
+// AIS safety related message (message 12 addressed / 14 broadcast,
+// PGN 129801/129802), e.g. "SART ACTIVE" or a navigational warning.
+struct AisSafetyMessage {
+    std::uint32_t mmsi = 0;
+    std::string text;
+    bool addressed = false;  // message 12: addressed to one station (possibly us)
 };
 
 }  // namespace boat::core

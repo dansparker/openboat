@@ -151,3 +151,54 @@ TEST(Nmea2000, FastPacketLostFrameDiscardsMessage) {
     EXPECT_FALSE(fp.push(frame(129038, first)));
     EXPECT_FALSE(fp.push(frame(129038, third)));  // frame 1 missing
 }
+
+TEST(Nmea2000, AisAidToNavigationAndBaseStation) {
+    core::DataBus bus;
+    nmea2000::Decoder d(bus);
+    std::vector<std::uint8_t> msg(26, 0xFF);
+    msg[0] = 21;
+    put32(msg, 1, 992111234);
+    put32(msg, 5, static_cast<std::uint32_t>(90870000));   // lon 9.087
+    put32(msg, 9, static_cast<std::uint32_t>(476775000));  // lat 47.6775
+    put16(msg, 14, 30);                                    // 3.0 m
+    put16(msg, 16, 20);                                    // 2.0 m
+    msg[22] = 0x40 | 0x20 | 25;                            // virtual, off position, type 25
+    const std::string name = "ERMATINGEN";
+    msg.push_back(static_cast<std::uint8_t>(name.size() + 2));
+    msg.push_back(1);  // ASCII
+    msg.insert(msg.end(), name.begin(), name.end());
+    nmea2000::Message m;
+    m.id.pgn = 129041;
+    m.data = msg;
+    ASSERT_TRUE(d.decode(m));
+    auto a = bus.latest<core::AisReport>()->value;
+    EXPECT_EQ(a.station, core::AisStation::AtoN);
+    EXPECT_EQ(a.aton_type, 25);
+    EXPECT_TRUE(a.virtual_aton);
+    EXPECT_TRUE(a.off_position);
+    EXPECT_EQ(a.name, "ERMATINGEN");
+    EXPECT_NEAR(a.position->lat_deg, 47.6775, 1e-6);
+
+    m.id.pgn = 129793;
+    m.data.resize(20);
+    ASSERT_TRUE(d.decode(m));
+    EXPECT_EQ(bus.latest<core::AisReport>()->value.station, core::AisStation::BaseStation);
+}
+
+TEST(Nmea2000, AisSafetyBroadcast) {
+    core::DataBus bus;
+    nmea2000::Decoder d(bus);
+    std::vector<std::uint8_t> msg{14, 0, 0, 0, 0, 0xFF};
+    put32(msg, 1, 970123456U | 0xC0000000U);
+    const std::string text = "SART ACTIVE";
+    msg.push_back(static_cast<std::uint8_t>(text.size() + 2));
+    msg.push_back(1);
+    msg.insert(msg.end(), text.begin(), text.end());
+    nmea2000::Message m;
+    m.id.pgn = 129802;
+    m.data = msg;
+    ASSERT_TRUE(d.decode(m));
+    const auto s = bus.latest<core::AisSafetyMessage>()->value;
+    EXPECT_EQ(s.mmsi, 970123456U);
+    EXPECT_EQ(s.text, "SART ACTIVE");
+}

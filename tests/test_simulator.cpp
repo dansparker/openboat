@@ -42,5 +42,6 @@ TEST(Simulator, ModulesWorkTogetherOnTheBus) {
     EXPECT_TRUE(bus.latest<core::TrueWind>());
     const auto ais = bus.latest<nav::AisTargetList>();
     ASSERT_TRUE(ais);
-    EXPECT_EQ(ais->value.targets.size(), 3U);  // ship, anchored boat, MOB device in test mode
+    EXPECT_EQ(ais->value.targets.size(), 4U);  // ship, anchored boat, MOB device in test mode, virtual AtoN
+    EXPECT_EQ(ais->value.messages.size(), 1U);  // "MOB TEST"
 }

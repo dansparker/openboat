@@ -134,6 +134,13 @@ void BoatModel::poll() {
         anchor_distance_ = anchor->value.distance_m;
     }
     ais_.clear();
+    ais_messages_.clear();
+    const auto kind_name = [](boat::nav::AisKind k) {
+        return k == boat::nav::AisKind::Sart  ? QStringLiteral("sart")
+               : k == boat::nav::AisKind::Mob  ? QStringLiteral("mob")
+               : k == boat::nav::AisKind::Epirb ? QStringLiteral("epirb")
+                                                 : QStringLiteral("vessel");
+    };
     if (const auto list = fresh<boat::nav::AisTargetList>(bus_, 5s)) {
         for (const auto& t : list->targets) {
             QVariantMap m;
@@ -156,14 +163,27 @@ void BoatModel::poll() {
             m[QStringLiteral("beamM")] = t.data.beam_m.value_or(0.0);
             m[QStringLiteral("navStatus")] = t.data.nav_status ? static_cast<int>(*t.data.nav_status) : -1;
             m[QStringLiteral("ageS")] = std::chrono::duration<double>(core::Clock::now() - t.last_position).count();
-            m[QStringLiteral("kind")] = t.kind == boat::nav::AisKind::Sart  ? QStringLiteral("sart")
-                                        : t.kind == boat::nav::AisKind::Mob  ? QStringLiteral("mob")
-                                        : t.kind == boat::nav::AisKind::Epirb ? QStringLiteral("epirb")
-                                                                              : QStringLiteral("vessel");
+            m[QStringLiteral("kind")] = kind_name(t.kind);
+            m[QStringLiteral("station")] = t.data.station == core::AisStation::BaseStation ? QStringLiteral("base")
+                                           : t.data.station == core::AisStation::AtoN     ? QStringLiteral("aton")
+                                                                                         : QStringLiteral("vessel");
+            m[QStringLiteral("atonType")] = static_cast<int>(t.data.aton_type);
+            m[QStringLiteral("virtualAton")] = t.data.virtual_aton;
+            m[QStringLiteral("offPosition")] = t.data.off_position;
             m[QStringLiteral("beaconTest")] = t.beacon_test;
             m[QStringLiteral("lost")] = t.lost;
             m[QStringLiteral("classB")] = t.data.class_b;
             ais_.append(m);
+        }
+        for (const auto& e : list->messages) {
+            QVariantMap m;
+            m[QStringLiteral("mmsi")] = static_cast<qulonglong>(e.message.mmsi);
+            m[QStringLiteral("sender")] = QString::fromStdString(e.sender);
+            m[QStringLiteral("text")] = QString::fromStdString(e.message.text);
+            m[QStringLiteral("kind")] = kind_name(e.kind);
+            m[QStringLiteral("ageMin")] = e.age_s / 60.0;
+            m[QStringLiteral("addressed")] = e.message.addressed;
+            ais_messages_.append(m);
         }
     }
     guidance_.clear();

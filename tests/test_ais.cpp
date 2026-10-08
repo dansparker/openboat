@@ -53,3 +53,50 @@ TEST(Ais, OwnShipVdoIsNotATarget) {
 TEST(Ais, TooShortPayloadIsRejected) {
     EXPECT_FALSE(nmea0183::AisDecoder::decode_payload("177KQJ", 0));
 }
+
+TEST(Ais, Type4BaseStation) {
+    const auto r = nmea0183::AisDecoder::decode_payload("403OviQuMGCqWrRO9>E6fE700@GO", 0);
+    ASSERT_TRUE(r);
+    EXPECT_EQ(r->mmsi, 3669702U);
+    EXPECT_EQ(r->station, core::AisStation::BaseStation);
+    EXPECT_NEAR(r->position->lat_deg, 36.883767, 1e-5);
+    EXPECT_NEAR(r->position->lon_deg, -76.352362, 1e-5);
+}
+
+TEST(Ais, Type21AidToNavigation) {
+    // virtual, off position, type 1 (reference point)
+    const auto r = nmea0183::AisDecoder::decode_payload("E>j9bPPQ7R2W9RRh:2ab00000000Dk6`=a04P10888v@10", 4);
+    ASSERT_TRUE(r);
+    EXPECT_EQ(r->mmsi, 992111234U);
+    EXPECT_EQ(r->station, core::AisStation::AtoN);
+    EXPECT_EQ(r->aton_type, 1);
+    EXPECT_EQ(r->name, "BODENSEE TEST");
+    EXPECT_NEAR(r->position->lat_deg, 47.6775, 1e-5);
+    EXPECT_NEAR(r->position->lon_deg, 9.087, 1e-5);
+    EXPECT_TRUE(r->virtual_aton);
+    EXPECT_TRUE(r->off_position);
+}
+
+TEST(Ais, Type21NameExtension) {
+    const auto r = nmea0183::AisDecoder::decode_payload("E>j9bPhRa6Pb4W3RW@40S2W2TW30Dj50=`oB010888v0024U0", 4);
+    ASSERT_TRUE(r);
+    EXPECT_EQ(r->name, "ERMATINGEN HAFENEINFAHRT");
+    EXPECT_FALSE(r->virtual_aton);
+    EXPECT_FALSE(r->off_position);
+}
+
+TEST(Ais, SafetyMessagesViaParser) {
+    core::DataBus bus;
+    nmea0183::Parser p(bus);
+    p.feed(with_checksum("!AIVDM,1,1,,A,>>M;`h1<59B04=@UHD,2"));
+    auto m = bus.latest<core::AisSafetyMessage>();
+    ASSERT_TRUE(m);
+    EXPECT_EQ(m->value.mmsi, 970123456U);
+    EXPECT_EQ(m->value.text, "SART ACTIVE");
+    EXPECT_FALSE(m->value.addressed);
+    EXPECT_FALSE(bus.latest<core::AisReport>());  // no station report
+    p.feed(with_checksum("!AIVDM,1,1,,A,<39>Jh@jRo?tCDEB=G1B>E>7,0"));
+    m = bus.latest<core::AisSafetyMessage>();
+    EXPECT_EQ(m->value.text, "STURMWARNUNG");
+    EXPECT_TRUE(m->value.addressed);
+}

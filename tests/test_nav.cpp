@@ -200,3 +200,55 @@ TEST(AisTable, BeaconInTestModeDoesNotAlarm) {
     nav::AlarmEvaluator e;
     EXPECT_FALSE(has(e.evaluate(fix(kHome, now), std::nullopt, list, now), nav::AlarmId::AisBeacon));
 }
+
+TEST(AisTable, FixedStationsHaveNoCpaAndComeLast) {
+    nav::AisTable table;
+    const auto now = core::Clock::now();
+    core::AisReport aton;
+    aton.mmsi = 992111234;
+    aton.station = core::AisStation::AtoN;
+    aton.off_position = true;
+    aton.name = "TONNE 3";
+    aton.position = core::destination(kHome, 0.0, 200.0);  // right ahead
+    table.update(aton, now);
+    core::AisReport ship;
+    ship.mmsi = 211234560;
+    ship.position = core::destination(kHome, 90.0, 3000.0);
+    table.update(ship, now);
+    const auto list = table.evaluate(fix(kHome, now).value, core::CourseOverGround{0.0, 3.0}, now);
+    ASSERT_EQ(list.targets.size(), 2U);
+    EXPECT_EQ(list.targets[1].data.station, core::AisStation::AtoN);  // nearer, but after the ship
+    EXPECT_FALSE(list.targets[1].cpa_m);
+    EXPECT_FALSE(list.targets[1].dangerous);
+    // still listed after 5 min without a report (AtoN report every 3 min)
+    EXPECT_FALSE(table.evaluate(fix(kHome, now).value, std::nullopt, now + 5min).targets.back().lost);
+
+    nav::AlarmEvaluator e;
+    const auto alarms = e.evaluate(fix(kHome, now), std::nullopt, list, now);
+    ASSERT_TRUE(has(alarms, nav::AlarmId::AtonOffPosition));
+    EXPECT_EQ(alarms.sound, nav::AlarmLevel::Warning);
+}
+
+TEST(AisTable, SafetyMessagesAlarmUnlessTest) {
+    nav::AisTable table;
+    const auto now = core::Clock::now();
+    table.message({211000001, "STURMWARNUNG", false}, now);
+    table.message({972000123, "MOB TEST", false}, now);
+    table.message({211000001, "STURMWARNUNG", false}, now + 1s);  // repeated: one entry
+    auto list = table.evaluate(fix(kHome, now).value, std::nullopt, now + 2s);
+    ASSERT_EQ(list.messages.size(), 2U);
+    EXPECT_EQ(list.messages[0].message.text, "STURMWARNUNG");  // newest first
+
+    nav::AlarmEvaluator e;
+    auto alarms = e.evaluate(fix(kHome, now), std::nullopt, list, now);
+    EXPECT_EQ(std::count_if(alarms.active.begin(), alarms.active.end(),
+                            [](const nav::Alarm& a) { return a.id == nav::AlarmId::AisMessage; }),
+              1);
+    EXPECT_EQ(alarms.sound, nav::AlarmLevel::Warning);
+
+    table.message({970123456, "SART ACTIVE", false}, now + 3s);  // from a beacon: alarm
+    list = table.evaluate(fix(kHome, now).value, std::nullopt, now + 4s);
+    EXPECT_EQ(e.evaluate(fix(kHome, now), std::nullopt, list, now).sound, nav::AlarmLevel::Alarm);
+    // after an hour the messages are gone
+    EXPECT_TRUE(table.evaluate(fix(kHome, now).value, std::nullopt, now + 2h).messages.empty());
+}

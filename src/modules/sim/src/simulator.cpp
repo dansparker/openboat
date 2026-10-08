@@ -76,6 +76,13 @@ SimState simulate(double t, const SimSettings& settings) {
     s.beacon.nav_status = 15;  // test
     s.beacon.sog_mps = 0.0;
     s.beacon.position = core::destination(centre, 200.0, 1400.0);
+
+    s.aton.mmsi = 992036001;
+    s.aton.station = core::AisStation::AtoN;
+    s.aton.name = "UNTIEFE SIMULATION";
+    s.aton.aton_type = 28;  // isolated danger (floating)
+    s.aton.virtual_aton = true;
+    s.aton.position = core::destination(centre, 120.0, 1300.0);
     return s;
 }
 
@@ -107,9 +114,13 @@ void Simulator::start(core::DataBus& bus) {
             bus.publish(s.wind);
             bus.publish(s.water);
             if (settings_.ais_targets && tick % 10 == 0) bus.publish(s.ais);  // AIS: every 2 s like a class A at speed
+            if (settings_.ais_targets && tick % 300 == 0) {  // the test beacon also announces its test
+                bus.publish(core::AisSafetyMessage{s.beacon.mmsi, "MOB TEST", false});
+            }
             if (settings_.ais_targets && tick % 50 == 0) {                    // slow / anchored: rarely
                 bus.publish(s.anchored);
                 bus.publish(s.beacon);
+                bus.publish(s.aton);
             }
             ++tick;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));

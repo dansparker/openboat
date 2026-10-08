@@ -255,8 +255,9 @@ bool Parser::feed(std::string_view raw) {
         const auto fill = integer(field(6)).value_or(0);
         if (count && number && !field(5).empty()) {
             const char channel = field(4).empty() ? '-' : field(4).front();
-            if (auto report = ais_.feed(*count, *number, field(3), channel, field(5), fill)) {
-                if (report->mmsi != 0) bus_.publish(*report);
+            if (auto msg = ais_.feed(*count, *number, field(3), channel, field(5), fill)) {
+                if (msg->report && msg->report->mmsi != 0) bus_.publish(*msg->report);
+                if (msg->safety && msg->safety->mmsi != 0) bus_.publish(*msg->safety);
             }
             ok = true;
         }

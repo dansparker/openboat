@@ -50,8 +50,17 @@ struct AisTarget {
     bool lost = false;  // no position for a while: shown greyed out
 };
 
+// A received safety related message with its sender's name (if known)
+struct AisSafetyEntry {
+    core::AisSafetyMessage message;
+    std::string sender;  // name or MMSI
+    AisKind kind = AisKind::Vessel;
+    double age_s = 0.0;
+};
+
 struct AisTargetList {
-    std::vector<AisTarget> targets;
+    std::vector<AisTarget> targets;  // ships, beacons, base stations, aids to navigation
+    std::vector<AisSafetyEntry> messages;  // newest first, last hour
 };
 
 struct AisSettings {
@@ -60,6 +69,10 @@ struct AisSettings {
     double lost_after_s = 3 * 60.0;
     double remove_after_s = 10 * 60.0;
     double ignore_slower_than_mps = 0.25;  // anchored boats do not alarm
+    // Aids to navigation report every 3 min, base stations every 10 s:
+    // fixed stations are kept longer before they count as lost
+    double station_lost_after_s = 10 * 60.0;
+    double station_remove_after_s = 30 * 60.0;
 };
 
 class AisTable {
@@ -68,6 +81,7 @@ public:
     void set_settings(const AisSettings& s) { settings_ = s; }
 
     void update(const core::AisReport& report, Clock::time_point now);
+    void message(const core::AisSafetyMessage& message, Clock::time_point now);
     // Recomputes range/CPA against own ship and expires old targets.
     AisTargetList evaluate(const std::optional<core::Position>& own, const std::optional<core::CourseOverGround>& cog,
                            Clock::time_point now);
@@ -75,12 +89,15 @@ public:
 private:
     AisSettings settings_;
     std::map<std::uint32_t, AisTarget> targets_;
+    std::vector<std::pair<core::AisSafetyMessage, Clock::time_point>> messages_;  // newest last
 };
 
 // ---- Alarms -----------------------------------------------------------------
 
 // Values are shown by the UI: append only
-enum class AlarmId : std::uint8_t { AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival, Mob, AisBeacon };
+enum class AlarmId : std::uint8_t {
+    AnchorDrag, ShallowWater, AisCollision, GnssLost, DepthLost, Arrival, Mob, AisBeacon, AisMessage, AtonOffPosition
+};
 
 // Alarm: immediate danger, continuous fast beeping until acknowledged.
 // Warning: degraded information, short double beep every few seconds.
@@ -125,6 +142,8 @@ struct AlarmSettings {
     std::optional<double> shallow_m = 2.0;  // nullopt = off
     double gnss_timeout_s = 5.0;
     double depth_timeout_s = 10.0;  // only once a depth has been seen
+    double off_position_warning_m = 2 * 1852.0;  // drifted buoy nearer than this: warning
+    double message_alarm_s = 10 * 60.0;          // AIS safety message alarm active for
 };
 
 class AlarmEvaluator {

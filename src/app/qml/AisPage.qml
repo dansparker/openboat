@@ -41,6 +41,23 @@ Rectangle {
         return c === 4 ? "Hochgeschwindigkeitsfahrzeug" : c === 6 ? "Fahrgastschiff" : c === 7 ? "Frachtschiff"
              : c === 8 ? "Tanker" : n > 0 ? "Typ " + n : "unbekannt";
     }
+    // ITU-R M.1371 table 74 (aid to navigation type)
+    function atonText(n) {
+        const names = ["", "Referenzpunkt", "RACON", "Bauwerk im Wasser", "", "Feuer", "Sektorenfeuer",
+                       "Richtfeuer (Unterfeuer)", "Richtfeuer (Oberfeuer)", "Kardinalbake Nord", "Kardinalbake Ost",
+                       "Kardinalbake Süd", "Kardinalbake West", "Backbord-Bake", "Steuerbord-Bake",
+                       "Abzweigungsbake Backbord", "Abzweigungsbake Steuerbord", "Einzelgefahrbake", "Ansteuerungsbake",
+                       "Sonderbake", "Kardinaltonne Nord", "Kardinaltonne Ost", "Kardinaltonne Süd", "Kardinaltonne West",
+                       "Backbordtonne", "Steuerbordtonne", "Abzweigungstonne Backbord", "Abzweigungstonne Steuerbord",
+                       "Einzelgefahrtonne", "Ansteuerungstonne", "Sondertonne", "Feuerschiff / Großtonne"];
+        return names[n] || "Seezeichen";
+    }
+    function stationText(t) {
+        if (t.station === "base") return "AIS-Basisstation";
+        if (t.station === "aton") return (t.virtualAton ? "Virtuelles Seezeichen (nur Funksignal!) – " : "") + atonText(t.atonType)
+                                         + (t.offPosition ? " – NICHT AUF POSITION" : "");
+        return "";
+    }
     function statusText(s) {
         return ["in Fahrt (Maschine)", "vor Anker", "manövrierunfähig", "manövrierbehindert", "tiefgangbehindert",
                 "festgemacht", "auf Grund", "beim Fischen", "in Fahrt (Segel)"][s] || "";
@@ -89,6 +106,31 @@ Rectangle {
                 width: parent.width
                 spacing: 4
 
+                // Safety related messages (AIS 12/14), newest first
+                Repeater {
+                    model: boat.aisMessages
+                    Rectangle {
+                        required property var modelData
+                        readonly property bool urgent: modelData.kind !== "vessel" && modelData.text.indexOf("TEST") < 0
+                        width: list.width
+                        height: msgText.implicitHeight + 12
+                        radius: 4
+                        color: urgent ? (Theme.night ? "#3a0000" : "#8a1010") : Theme.button
+                        border.color: Theme.buttonBorder
+                        Text {
+                            id: msgText
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            anchors.leftMargin: 8
+                            wrapMode: Text.WordWrap
+                            color: parent.urgent ? "white" : Theme.text
+                            font.pixelSize: 16
+                            text: "✉ " + modelData.sender + (modelData.addressed ? " (an uns)" : "") + ": „" + modelData.text + "“  ·  vor "
+                                  + (modelData.ageMin < 1 ? "<1" : Math.round(modelData.ageMin)) + " min"
+                        }
+                    }
+                }
+
                 Text {
                     visible: boat.aisTargets.length === 0
                     width: list.width
@@ -135,7 +177,9 @@ Rectangle {
                                     font.pixelSize: 17
                                     font.bold: row.beacon || row.t.dangerous
                                     text: (row.t.kind !== "vessel" ? page.kindText(row.t) + "  " : "")
-                                          + (row.t.name || row.t.mmsi) + (row.t.lost ? " (verloren)" : "")
+                                          + (row.t.station === "base" ? "AIS-Basisstation " : row.t.station === "aton" ? (row.t.virtualAton ? "V-AIS " : "◇ ") : "")
+                                          + (row.t.name || row.t.mmsi) + (row.t.offPosition ? " – nicht auf Position!" : "")
+                                          + (row.t.lost ? " (verloren)" : "")
                                 }
                                 Text { Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight; color: row.fg; font.pixelSize: 17; font.family: Theme.mono; text: page.nm(row.t.rangeNm) }
                                 Text { Layout.preferredWidth: 70; horizontalAlignment: Text.AlignRight; color: row.fg; font.pixelSize: 17; font.family: Theme.mono; text: page.deg(row.t.bearing) }
@@ -156,12 +200,13 @@ Rectangle {
                                     font.pixelSize: 15
                                     text: {
                                         const t = row.t;
-                                        const parts = ["MMSI " + t.mmsi + (t.classB ? " · Klasse B" : " · Klasse A")];
+                                        const parts = ["MMSI " + t.mmsi + (t.station !== "vessel" ? "" : t.classB ? " · Klasse B" : " · Klasse A")];
                                         if (t.callsign) parts.push("Rufzeichen " + t.callsign);
-                                        if (t.kind === "vessel") parts.push(page.typeText(t.shipType));
+                                        if (t.station !== "vessel") parts.push(page.stationText(t));
+                                        else if (t.kind === "vessel") parts.push(page.typeText(t.shipType));
                                         if (t.lengthM > 0) parts.push(t.lengthM.toFixed(0) + " × " + t.beamM.toFixed(0) + " m");
                                         if (page.statusText(t.navStatus)) parts.push(page.statusText(t.navStatus));
-                                        parts.push("COG " + (t.hasCog ? page.deg(t.cog) : "—") + " · HDG " + page.deg(t.heading));
+                                        if (t.station === "vessel") parts.push("COG " + (t.hasCog ? page.deg(t.cog) : "—") + " · HDG " + page.deg(t.heading));
                                         parts.push("letzte Position vor " + page.age(t.ageS));
                                         return parts.join("  ·  ");
                                     }

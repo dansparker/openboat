@@ -41,7 +41,9 @@ Simulator mit Demo-Route (`--demo`), Grundkarte aus OpenStreetMap (`tools/make_b
 | Kartenplotter (BlueChart g3 / Navionics) | Rasterkarten aus MBTiles: **selbst gerenderte Grundkarte aus OpenStreetMap** (`tools/make_basemap.py`) + OpenSeaMap-Seezeichen, Eigenschiff, COG-Vektor, Kursstrich | ✅ v0.2 |
 | GPS / Kompass / Log / Echolot / Wind | NMEA 0183 (UDP, TCP, seriell, Logdatei) und NMEA 2000 (SocketCAN, candump) | ✅ v0.1 (ungetestet an Hardware) |
 | Datenleiste | SOG, COG, Steuerkurs, Fahrt durchs Wasser, Tiefe, scheinbarer/wahrer Wind, Wassertemperatur | ✅ v0.1 |
-| AIS | Ziele aus AIVDM (Typ 1/2/3/5/18/19/24) und NMEA 2000 (129038/129039), CPA/TCPA, Kollisionswarnung | ✅ v0.1 |
+| AIS | Ziele aus AIVDM (Typ 1/2/3/4/5/18/19/21/24) und NMEA 2000 (129038/129039/129041/129793), CPA/TCPA, Kollisionswarnung | ✅ v0.1 |
+| AIS-Seezeichen und Basisstationen | Eigene Symbole (Raute, virtuell gestrichelt; Quadrat), Seezeichenart, Warnung bei vertriebener Tonne in der Nähe | ✅ v0.2 |
+| AIS-Sicherheitsmeldungen | Typ 12/14 und PGN 129802 in der AIS-Liste; Warnung, von Notsendern Alarm, Testmeldungen ohne Alarm | ✅ v0.2 |
 | AIS-Zielliste | Notsender zuerst, dann Kollisionsgefahr, dann Distanz; Details (Rufzeichen, Typ, Maße, Status), „Auf Karte“, Ziel auf der Karte antippen | ✅ v0.2 |
 | AIS-SART / MOB / EPIRB | Erkennung an der MMSI (970/972/974), eigenes Kartensymbol, Alarm unabhängig vom CPA; Testaussendungen (Status 15) ohne Alarm | ✅ v0.2 |
 | Missweisung | Vom Gerät (RMC, HDG, PGN 127250/127258), sonst aus dem World Magnetic Model (WMM2025, mitgeliefert, gültig bis Ende 2029) | ✅ v0.2 |
