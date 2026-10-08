@@ -13,8 +13,6 @@ namespace boat::sim {
 
 namespace {
 
-constexpr core::GeoPoint kCentre{47.8700, 13.5450};  // Attersee
-constexpr double kRadiusM = 900.0;
 constexpr double kSpeedMps = 5.0 * core::kMpsPerKnot;
 constexpr double kTrueWindFromDeg = 300.0;
 constexpr double kVariationDeg = 5.0;  // about the WMM value at the Attersee
@@ -23,12 +21,14 @@ constexpr double kDeg = std::numbers::pi / 180.0;
 
 }  // namespace
 
-SimState simulate(double t) {
+SimState simulate(double t, const SimSettings& settings) {
+    const core::GeoPoint centre = settings.centre;
+    const double radius_m = std::max(50.0, settings.radius_m);
     SimState s;
     // Clockwise circle: bearing from the centre grows with time
-    const double omega = kSpeedMps / kRadiusM;  // rad/s
+    const double omega = kSpeedMps / radius_m;  // rad/s
     const double bearing = core::normalize_deg(t * omega / kDeg);
-    s.position.point = core::destination(kCentre, bearing, kRadiusM);
+    s.position.point = core::destination(centre, bearing, radius_m);
     s.position.quality = core::FixQuality::Simulated;
     s.position.satellites = 12;
     s.position.hdop = 0.8;
@@ -58,7 +58,7 @@ SimState simulate(double t) {
     s.ais.cog_deg = 180.0;
     s.ais.sog_mps = 8.0 * core::kMpsPerKnot;
     s.ais.heading_deg = 180.0;
-    s.ais.position = core::destination(core::destination(kCentre, 0.0, 1800.0), 180.0, leg * *s.ais.sog_mps);
+    s.ais.position = core::destination(core::destination(centre, 0.0, 1800.0), 180.0, leg * *s.ais.sog_mps);
 
     s.anchored.mmsi = 203888456;
     s.anchored.class_b = true;
@@ -70,12 +70,12 @@ SimState simulate(double t) {
     s.anchored.cog_deg = 0.0;
     // Far enough from the circle that no straight-line CPA comes near (a boat at
     // anchor dead ahead SHOULD alarm - just not in every demo screenshot)
-    s.anchored.position = core::destination(kCentre, 340.0, 2600.0);
+    s.anchored.position = core::destination(centre, 340.0, 2600.0);
 
     s.beacon.mmsi = 972000123;
     s.beacon.nav_status = 15;  // test
     s.beacon.sog_mps = 0.0;
-    s.beacon.position = core::destination(kCentre, 200.0, 1400.0);
+    s.beacon.position = core::destination(centre, 200.0, 1400.0);
     return s;
 }
 
@@ -88,7 +88,7 @@ void Simulator::start(core::DataBus& bus) {
         int tick = 0;
         while (running_) {
             const double t = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-            const SimState s = simulate(t);
+            const SimState s = simulate(t, settings_);
             // A GNSS receiver also delivers UTC
             bus.publish(core::UtcTime{std::chrono::duration_cast<std::chrono::milliseconds>(
                                           std::chrono::system_clock::now().time_since_epoch())
@@ -106,8 +106,8 @@ void Simulator::start(core::DataBus& bus) {
             bus.publish(depth);
             bus.publish(s.wind);
             bus.publish(s.water);
-            if (tick % 10 == 0) bus.publish(s.ais);  // AIS: every 2 s like a class A at speed
-            if (tick % 50 == 0) {                    // slow / anchored: rarely
+            if (settings_.ais_targets && tick % 10 == 0) bus.publish(s.ais);  // AIS: every 2 s like a class A at speed
+            if (settings_.ais_targets && tick % 50 == 0) {                    // slow / anchored: rarely
                 bus.publish(s.anchored);
                 bus.publish(s.beacon);
             }

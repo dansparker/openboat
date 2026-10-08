@@ -82,7 +82,15 @@ QString resolve(const QString& base_dir, const QString& path) {
 
 std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_dir, double depth_offset) {
     const QString type = s.value("type").toString();
-    if (type == "sim") return std::make_unique<boat::sim::Simulator>();
+    if (type == "sim") {
+        boat::sim::SimSettings sim;
+        sim.centre.lat_deg = s.value("lat").toDouble(sim.centre.lat_deg);
+        sim.centre.lon_deg = s.value("lon").toDouble(sim.centre.lon_deg);
+        sim.radius_m = s.value("radius_m").toDouble(sim.radius_m);
+        // elsewhere than the Attersee the demo AIS targets would sail over land
+        sim.ais_targets = s.value("ais").toBool(!s.contains("lat"));
+        return std::make_unique<boat::sim::Simulator>(sim);
+    }
     if (type == "nmea0183") {
         boat::nmea0183::SourceConfig c;
         const QString kind = s.value("kind").toString("udp");

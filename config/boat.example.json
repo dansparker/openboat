@@ -3,6 +3,7 @@
     { "type": "sim" }
   ],
   "_sources_examples": [
+    { "type": "sim", "lat": 47.6775, "lon": 9.087, "radius_m": 300, "ais": false },
     { "type": "nmea0183", "kind": "udp", "port": 10110 },
     { "type": "nmea0183", "kind": "tcp", "host": "192.168.4.1", "port": 10110 },
     { "type": "nmea0183", "kind": "serial", "device": "/dev/ttyUSB0", "baud": 38400 },

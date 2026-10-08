@@ -1,0 +1,67 @@
+# Manually started: base chart + seamarks + simulator screenshots for any area.
+#   gh workflow run area.yml -f name=ermatingen -f bbox=9.03,47.65,9.14,47.70 -f lat=47.6775 -f lon=9.087
+# Uses only open data (OpenStreetMap, OpenSeaMap); no depths (none are invented
+# for a real place - real ones come from tools/make_depth.py with open data).
+name: Area screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      name: { description: "Short name (artifact)", required: true, default: "ermatingen" }
+      bbox: { description: "lon_min,lat_min,lon_max,lat_max (max. ~0.02 deg²)", required: true, default: "9.03,47.65,9.14,47.70" }
+      lat: { description: "Simulator circle centre latitude (on the water)", required: true, default: "47.6775" }
+      lon: { description: "Simulator circle centre longitude", required: true, default: "9.087" }
+      radius: { description: "Circle radius in metres (must stay on the water)", required: true, default: "300" }
+      zooms: { description: "Screenshot zoom levels", required: true, default: "14 15 16" }
+
+jobs:
+  area:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Ninja and system libraries
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgl-dev libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 xvfb
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          modules: qtmultimedia
+          cache: true
+      - name: Build
+        run: cmake --preset release -DBOAT_BUILD_TESTS=OFF && cmake --build --preset release
+      - name: Base chart from OpenStreetMap (Overpass, several attempts)
+        run: |
+          pip install pillow
+          for i in 1 2 3; do
+            python3 tools/make_basemap.py --bbox "${{ inputs.bbox }}" --zooms 11-17 --out charts/area.mbtiles && break
+            rm -f charts/area.mbtiles; sleep 60
+          done
+          test -f charts/area.mbtiles
+      - name: OpenSeaMap seamarks (small area, polite)
+        run: |
+          python3 tools/fetch_tiles.py --url "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png" --bbox "${{ inputs.bbox }}" --zooms 14-16 --out charts/area-seamarks.mbtiles --name "OpenSeaMap seamarks" --attribution "OpenSeaMap, CC BY-SA" --overlay --delay 0.5 || true
+      - name: Screenshots
+        run: |
+          python3 - <<'PY'
+          import json
+          c = json.load(open("config/boat.example.json", encoding="utf-8"))
+          c["sources"] = [{"type": "sim", "lat": float("${{ inputs.lat }}"), "lon": float("${{ inputs.lon }}"),
+                           "radius_m": float("${{ inputs.radius }}"), "ais": False}]
+          c["charts"] = ["../charts/area.mbtiles", "../charts/area-seamarks.mbtiles"]
+          c["navigation_file"] = "area-navigation.gpx"
+          c["track_dir"] = "area-tracks"
+          json.dump(c, open("config/area.json", "w", encoding="utf-8"), indent=2)
+          PY
+          app=./build/release/src/app/openboat
+          for z in ${{ inputs.zooms }}; do
+            for mode in day night; do
+              flag=""; [ "$mode" = night ] && flag="--night"
+              rm -f config/settings.json
+              QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/area.json --zoom $z $flag --screenshot area-$mode-z$z.png --screenshot-delay 9000 > app.log 2>&1 || { cat app.log; exit 1; }
+              ! grep -E "TypeError|ReferenceError|is not defined" app.log
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: area-${{ inputs.name }}
+          path: area-*.png
