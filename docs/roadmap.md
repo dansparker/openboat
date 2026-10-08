@@ -20,7 +20,7 @@ Reihenfolge nach Nutzen für die Sicherheit an Bord, nicht nach Aufwand.
 
 ## v0.4 – Vektorkarten
 - ~~S-57 / Inland ENC lesen (GDAL) und konvertieren~~ ✅ (`tools/make_enc.py`)
-- ~~Darstellung nach S-52-Grundzügen: Tiefenflächen, Sicherheitskontur, Tonnen, Fahrrinnen~~ ✅ vereinfacht; offen: Feuersektoren, Brückendurchfahrtshöhen, Inland-ENC-Sonderobjekte (Pegel, Schleusen), echte Testzellen
+- ~~Darstellung nach S-52-Grundzügen: Tiefenflächen, Sicherheitskontur, Tonnen, Fahrrinnen~~ ✅ vereinfacht; ~~Feuersektoren, Brückendurchfahrtshöhen (mit Routenprüfung gegen die Masthöhe)~~ ✅; offen: Inland-ENC-Sonderobjekte (Pegel, Schleusen), Test mit echten Zellen, Durchfahrtshöhe abhängig vom aktuellen Pegel
 - ~~Beschriftungen ohne Überlappung auch bei Kurs oben~~ ✅, ~~Datumsgrenze in der App~~ ✅
 - ~~Tests der Bedienoberfläche~~ ✅ (Qt Quick Test in der CI)
 - ~~Tiefenlinien/-schattierung aus EMODnet bzw. S-57-Tiefenlinien~~ ✅ (`tools/make_depth.py`), ~~Sicherheitstiefe in der App~~ ✅, ~~aufrechte Beschriftungen~~ ✅

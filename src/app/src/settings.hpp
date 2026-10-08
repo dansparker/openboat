@@ -47,6 +47,9 @@ class Settings : public QObject {
     Q_PROPERTY(double lastLon READ lastLon NOTIFY changed)
     // Safety depth (m) for the depth chart: shallower water blue, heavy safety contour
     Q_PROPERTY(double safetyDepth READ safetyDepth WRITE setSafetyDepth NOTIFY changed)
+    // Highest point of the boat above the waterline (mast + antennas), m; 0 = not set.
+    // Bridges / cables lower than this are shown red and reported by the route check.
+    Q_PROPERTY(double airDraft READ airDraft WRITE setAirDraft NOTIFY changed)
 
     // Depth offset: "transducer" (use what the transducer sends) or "manual" (depthOffset
     // replaces it). Metres; < 0: depth below keel, > 0: depth below waterline.
@@ -90,6 +93,8 @@ public:
     // Saved only after moving more than 100 m (the SD card is not written every minute at anchor)
     Q_INVOKABLE void rememberPosition(double lat, double lon);
     double safetyDepth() const { return safety_depth_; }
+    double airDraft() const { return air_draft_; }
+    void setAirDraft(double v);
     QString depthOffsetMode() const { return depth_offset_mode_; }
     double depthOffset() const { return depth_offset_; }
     QString lastError() const { return error_; }
@@ -151,6 +156,7 @@ private:
     double last_lat_ = 47.87;  // first start: the simulator area
     double last_lon_ = 13.545;
     double safety_depth_ = 3.0;
+    double air_draft_ = 0.0;
     QString depth_offset_mode_ = QStringLiteral("transducer");
     double depth_offset_ = 0.0;
     QString error_;

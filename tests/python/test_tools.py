@@ -1,5 +1,6 @@
 """Checks for the chart tools (run: python tests/python/test_tools.py)."""
 
+import json
 import os
 import sys
 
@@ -94,6 +95,57 @@ def test_enc_labels_soundings_and_names():
     assert d["text"] == "2.4" and d["z"] == [14, 15]
     n = [l for l in labels if l["text"] == "Tonne 3"][0]
     assert n["z"] == [15]
+
+
+def test_light_characteristic():
+    props = {"LITCHR": "2", "SIGGRP": "(2)", "COLOUR": "3", "SIGPER": 6, "HEIGHT": 12, "VALNMR": 5}
+    assert make_enc.light_characteristic(props) == "Fl(2) R 6s 12m 5M"
+    assert make_enc.light_characteristic({"LITCHR": "1", "COLOUR": "1"}) == "F W"
+    m = make_enc.mark_from_feature("LIGHTS", {"SECTR1": "90", "SECTR2": "180", "COLOUR": "4"}, 9.0, 47.0)
+    assert m["sector"] == (90.0, 180.0)
+    assert make_enc.mark_from_feature("LIGHTS", {"SECTR1": "90"}, 9.0, 47.0)["sector"] is None
+
+
+def test_light_sector_shines_away_from_seaward_bearing():
+    # SECTR 90..180 (bearings from seaward) -> the light shines towards 270..360: the arc
+    # lies up-left of the light, nothing down-right
+    from PIL import Image
+    import io
+    lon, lat, z = 9.08, 47.67, 16
+    wx, wy = make_enc.world(lon, lat, z)
+    tx, ty = int(wx // 256), int(wy // 256)
+    lx, ly = wx - tx * 256, wy - ty * 256
+    m = make_enc.mark_from_feature("LIGHTS", {"SECTR1": 90, "SECTR2": 180, "COLOUR": "4"}, lon, lat)
+    img = Image.open(io.BytesIO(make_enc.render_marks_tile(z, tx, ty, [m], [], []))).convert("RGBA")
+
+    def green_near(bearing):
+        dx, dy = make_enc.bearing_xy(bearing, make_enc.SECTOR_RADIUS)
+        x, y = int(lx + dx), int(ly + dy)
+        if not (0 <= x < 256 and 0 <= y < 256):
+            return None
+        return any(img.getpixel((min(255, max(0, x + i)), min(255, max(0, y + j))))[1] > 120 and
+                   img.getpixel((min(255, max(0, x + i)), min(255, max(0, y + j))))[0] < 100
+                   for i in range(-2, 3) for j in range(-2, 3))
+
+    inside = [green_near(b) for b in (290, 315, 340)]
+    outside = [green_near(b) for b in (110, 135, 160)]
+    assert any(v for v in inside if v is not None), inside
+    assert not any(v for v in outside if v is not None), outside
+
+
+def test_clearances_labels_and_sidecar(tmp="clearances-test.json"):
+    bridge = make_enc.clearance_from_feature("BRIDGE", {"VERCLR": 6.2, "VERCCL": 4.5, "VERCOP": 30, "OBJNAM": "Br"},
+                                             [[(9.07, 47.67), (9.08, 47.67), (9.09, 47.67)]])
+    cable = make_enc.clearance_from_feature("CBLOHD", {"VERCLR": 18}, [[(9.1, 47.6), (9.1, 47.7)]])
+    unknown = make_enc.clearance_from_feature("PIPOHD", {}, [[(9.2, 47.6), (9.2, 47.7)]])
+    assert make_enc.clearance_value(bridge) == 4.5  # an opening bridge counts closed
+    labels = make_enc.labels_sidecar([], [], 13, 13, [bridge, cable])
+    b = [l for l in labels if l["value"] == 4.5][0]
+    assert b["kind"] == "clearance" and "offen 30" in b["text"] and (b["lon"], b["lat"]) == (9.08, 47.67)
+    n = make_enc.write_clearances(tmp, [bridge, cable, unknown])
+    data = json.load(open(tmp, encoding="utf-8"))["clearances"]
+    os.remove(tmp)
+    assert n == 2 and data[0]["clearance"] == 4.5 and data[0]["open"] == 30
 
 
 if __name__ == "__main__":

@@ -39,3 +39,10 @@ private:
 //   { ok, shallowLegs, minDepth (-1 = none), noDataPercent,
 //     marks: [{ lat, lon, depth, leg }]  (shallowest point of each shallow leg) }
 [[nodiscard]] QVariantMap checkRouteDepth(DepthChart& chart, const QVariantList& points, double safety_m);
+
+// Bridges, overhead cables and pipes (tools/make_enc.py *.clearances.json) that the
+// route passes under: { crossings: [{ lat, lon, clearance, name, kind, leg, low }], lowCount }.
+// low: clearance below the boat's air draught (air_draft_m <= 0: not set, nothing is low).
+// clearances: [{ kind, name, clearance, lines: [ [ [lon, lat], ... ], ... ] }]
+[[nodiscard]] QVariantMap checkRouteClearance(const QVariantList& points, const QVariantList& clearances,
+                                              double air_draft_m);

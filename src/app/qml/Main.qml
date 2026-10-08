@@ -14,7 +14,7 @@ Window {
     function saveEditedRoute() {
         let i = chartView.editRouteIndex;
         if (i < 0 || !routes.updateRoute(i, chartView.editPoints)) i = routes.addRoute(chartView.editPoints);
-        if (i >= 0) routes.checkRoute(i, settings.safetyDepth);
+        if (i >= 0) routes.checkRoute(i, settings.safetyDepth, settings.airDraft);
         return i;
     }
 
@@ -82,7 +82,10 @@ Window {
                 width: Math.min(parent.width - 40, checkRow.implicitWidth + 20)
                 height: checkRow.implicitHeight + 16
                 radius: 6
-                color: !c.available || c.noDataPercent > 2 ? "#6a5000" : c.ok ? "#145a32" : "#8a1010"
+                readonly property bool bad: (c.available && !c.ok) || c.lowCount > 0
+                readonly property bool unsure: !c.available || c.noDataPercent > 2
+                                               || ((c.crossings || []).length > 0 && !(c.airDraft > 0))
+                color: bad ? "#8a1010" : unsure ? "#6a5000" : "#145a32"
                 border.color: "white"
                 RowLayout {
                     id: checkRow
@@ -96,12 +99,22 @@ Window {
                         text: {
                             const c = parent.parent.c;
                             if (c.name === undefined) return "";
-                            if (!c.available) return c.name + ": keine Tiefenkarte geladen – Prüfung nicht möglich";
                             let t = c.name + ": ";
-                            t += c.ok ? "keine Stelle flacher als " + settings.depthText(c.safety)
-                                      : c.shallowLegs + " Abschnitt(e) flacher als " + settings.depthText(c.safety)
-                                        + " (min. " + settings.depthText(c.minDepth) + ", rot markiert)";
-                            if (c.noDataPercent > 2) t += " · " + Math.round(c.noDataPercent) + " % ohne Tiefendaten (Land oder außerhalb der Tiefenkarte) – selbst prüfen!";
+                            if (!c.available) t += "keine Tiefenkarte geladen – Tiefe nicht geprüft";
+                            else t += c.ok ? "keine Stelle flacher als " + settings.depthText(c.safety)
+                                           : c.shallowLegs + " Abschnitt(e) flacher als " + settings.depthText(c.safety)
+                                             + " (min. " + settings.depthText(c.minDepth) + ", rot markiert)";
+                            if (c.available && c.noDataPercent > 2) t += " · " + Math.round(c.noDataPercent) + " % ohne Tiefendaten (Land oder außerhalb der Tiefenkarte) – selbst prüfen!";
+                            // vertical clearances (bridges, overhead cables)
+                            const x = c.crossings || [];
+                            const kinds = { bridge: "Brücke", cable: "Freileitung", pipe: "Rohrbrücke", conveyor: "Förderband" };
+                            const desc = k => (kinds[k.kind] || "Durchfahrt") + (k.name ? " " + k.name : "") + " " + settings.depthText(k.clearance);
+                            if (c.lowCount > 0)
+                                t += " · ZU NIEDRIG für " + settings.depthText(c.airDraft) + ": " + x.filter(k => k.low).map(desc).join(", ");
+                            else if (x.length > 0 && !(c.airDraft > 0))
+                                t += " · " + x.length + " Durchfahrt(en) (" + x.map(desc).join(", ") + ") – Durchfahrtshöhe des Boots im Setup eintragen!";
+                            else if (x.length > 0)
+                                t += " · " + x.length + " Durchfahrt(en) hoch genug";
                             return t;
                         }
                     }

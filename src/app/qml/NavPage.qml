@@ -108,7 +108,7 @@ Rectangle {
                         TouchButton { text: "Start"; fontSize: 14; implicitHeight: 44; onClicked: { routes.startRoute(index, false); page.closeRequested(); } }
                         TouchButton { text: "Rückwärts"; fontSize: 14; implicitHeight: 44; onClicked: { routes.startRoute(index, true); page.closeRequested(); } }
                         TouchButton { text: "Bearbeiten"; fontSize: 14; implicitHeight: 44; onClicked: page.editRoute(index) }
-                        TouchButton { text: "Prüfen"; fontSize: 14; implicitHeight: 44; onClicked: { routes.checkRoute(index, settings.safetyDepth); page.closeRequested(); } }
+                        TouchButton { text: "Prüfen"; fontSize: 14; implicitHeight: 44; onClicked: { routes.checkRoute(index, settings.safetyDepth, settings.airDraft); page.closeRequested(); } }
                         TouchButton { text: "Löschen"; fontSize: 14; implicitHeight: 44; onHeld: routes.removeRoute(index) }
                     }
                 }

@@ -63,6 +63,7 @@ void Settings::load(const QJsonObject& o) {
         last_lon_ = clamp(p[1].toDouble(last_lon_), -180.0, 180.0);
     }
     safety_depth_ = clamp(o.value("safety_depth_m").toDouble(safety_depth_), 0.5, 100.0);
+    air_draft_ = clamp(o.value("air_draft_m").toDouble(air_draft_), 0.0, 60.0);
     depth_offset_mode_ = unit("depth_offset_mode", depth_offset_mode_, {"transducer", "manual"});
     depth_offset_ = clamp(o.value("depth_offset_m").toDouble(depth_offset_), -10.0, 10.0);
 }
@@ -84,7 +85,7 @@ void Settings::commit(bool nav, bool track) {
                         {"vector_minutes", vector_minutes_}, {"track_recording", track_recording_}, {"record_raw", record_raw_},
                         {"track_spacing_m", track_spacing_}, {"show_track", show_track_},
                         {"overzoom", overzoom_},           {"orientation", orientation_},
-                        {"show_labels", show_labels_}, {"last_position", QJsonArray{last_lat_, last_lon_}},     {"safety_depth_m", safety_depth_},           {"depth_offset_mode", depth_offset_mode_},
+                        {"show_labels", show_labels_}, {"last_position", QJsonArray{last_lat_, last_lon_}},     {"safety_depth_m", safety_depth_}, {"air_draft_m", air_draft_},           {"depth_offset_mode", depth_offset_mode_},
                         {"depth_offset_m", depth_offset_}};
     QSaveFile file(path_);
     if (file.open(QIODevice::WriteOnly) && file.write(QJsonDocument(o).toJson()) >= 0 && file.commit()) {
@@ -178,6 +179,10 @@ void Settings::rememberPosition(double lat, double lon) {
 }
 void Settings::setShowLabels(bool v) {
     show_labels_ = v;
+    commit(false, false);
+}
+void Settings::setAirDraft(double v) {
+    air_draft_ = clamp(v, 0.0, 60.0);
     commit(false, false);
 }
 void Settings::setSafetyDepth(double v) {

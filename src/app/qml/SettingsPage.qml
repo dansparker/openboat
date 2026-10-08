@@ -202,6 +202,25 @@ Rectangle {
                           : "Keine Tiefendaten"
                 }
 
+                StepRow {
+                    label: "Durchfahrtshöhe des Boots (Mast über Wasser)"
+                    value: settings.airDraft * settings.depthFactor
+                    stepSize: settings.depthUnit === "ft" ? 1 : 0.1
+                    maximum: 60 * settings.depthFactor
+                    decimals: settings.depthUnit === "ft" ? 0 : 1
+                    unit: settings.depthLabel
+                    zeroText: "nicht gesetzt"
+                    onChangedTo: v => settings.airDraft = v / settings.depthFactor
+                }
+                Text {
+                    width: content.width
+                    wrapMode: Text.WordWrap
+                    color: Theme.label
+                    font.pixelSize: 14
+                    text: "Brücken und Freileitungen darunter werden rot gezeigt und von der Routenprüfung gemeldet. "
+                          + "Die Kartenhöhen gelten für einen Bezugswasserstand (Flüsse meist HSW, See meist HAT) – Kartenhinweis und Pegel prüfen, Sicherheitsabstand einrechnen!"
+                }
+
                 Heading { text: "Navigation & Karte" }
                 Text {
                     width: content.width

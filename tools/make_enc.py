@@ -8,13 +8,21 @@ writes
                              depth-encoded overlay (same as tools/make_depth.py):
                              the app shades it for the safety depth set on its
                              settings page and draws the heavy safety contour
-  charts/enc-marks.mbtiles   buoys, beacons, lights, fairways, navigation lines
-  *.labels.json              soundings and names, drawn upright by the app
+  charts/enc-marks.mbtiles   buoys, beacons, lights with their sectors, fairways,
+                             navigation lines, bridges, overhead cables and pipes
+  *.labels.json              soundings, names, light characteristics and vertical
+                             clearances, drawn upright by the app
+  *.clearances.json          bridges / overhead cables / pipes with their vertical
+                             clearance: the app checks routes against the boat's
+                             air draught and shows too low clearances in red
 
 Symbols follow the S-52 ideas, simplified: shape from BOYSHP/BCNSHP (cone,
 can, sphere, pillar, spar), colours from COLOUR, cardinal topmarks from
-CATCAM, lights as a magenta flare. This is NOT a certified ECDIS rendering:
-check against the official chart.
+CATCAM, all-round lights as a magenta flare, sector lights as coloured arcs
+with dashed sector limits (SECTR1/SECTR2, bearings from seaward). Vertical
+clearances (VERCLR, closed: VERCCL) refer to the chart's reference level -
+on rivers usually the highest navigable water level (HSW): check the gauge.
+This is NOT a certified ECDIS rendering: check against the official chart.
 
 Where to get cells (free):
   Inland ENC: Danube (Austria: via donau, https://www.doris.bmk.gv.at), Rhine,
@@ -50,6 +58,7 @@ BEACONS = ("BCNLAT", "BCNCAR", "BCNSAW", "BCNSPP", "BCNISD")
 # Inland ENC uses lower-case object classes for its own objects; the mark classes are the same
 MARK_LAYERS = BUOYS + BEACONS + ("LIGHTS",)
 LINE_LAYERS = ("NAVLNE", "RECTRC")
+CLEARANCE_LAYERS = {"BRIDGE": "bridge", "CBLOHD": "cable", "PIPOHD": "pipe", "CONVYR": "conveyor"}
 AREA_LAYERS = ("FAIRWY",)
 DEPTH_LAYERS = ("DEPARE", "DEPCNT", "DRGARE")
 
@@ -73,6 +82,40 @@ def int_list(value):
     return out
 
 
+def number(value):
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+# LITCHR (S-57) -> abbreviation on the chart
+LITCHR = {1: "F", 2: "Fl", 3: "LFl", 4: "Q", 5: "VQ", 6: "UQ", 7: "Iso", 8: "Oc", 9: "IQ", 10: "IVQ", 11: "IUQ",
+          12: "Mo", 13: "FFl", 14: "Fl+LFl", 15: "OcFl", 16: "FLFl", 17: "Al.Oc", 18: "Al.LFl", 19: "Al.Fl",
+          20: "Al.Gr", 25: "Q+LFl", 26: "VQ+LFl", 27: "UQ+LFl", 28: "Al", 29: "Al.FFl"}
+COLOUR_LETTER = {1: "W", 3: "R", 4: "G", 5: "Bu", 6: "Y", 9: "Am", 10: "Vi", 11: "Or"}
+
+
+def light_characteristic(props):
+    """'Fl(2) R 6s 12m 5M' from LITCHR, SIGGRP, COLOUR, SIGPER, HEIGHT, VALNMR."""
+    parts = []
+    ch = int_list(props.get("LITCHR"))
+    if ch:
+        text = LITCHR.get(ch[0], "")
+        grp = str(props.get("SIGGRP") or "").strip()
+        if grp and grp not in ("()", "(1)"):
+            text += grp
+        parts.append(text)
+    col = "".join(COLOUR_LETTER.get(c, "") for c in int_list(props.get("COLOUR")))
+    if col:
+        parts.append(col)
+    for key, unit in (("SIGPER", "s"), ("HEIGHT", "m"), ("VALNMR", "M")):
+        v = number(props.get(key))
+        if v is not None:
+            parts.append(f"{v:g}{unit}")
+    return " ".join(p for p in parts if p)
+
+
 def mark_from_feature(layer, props, lon, lat):
     """Feature attributes -> mark dict for rendering (pure, unit tested)."""
     kind = "light" if layer == "LIGHTS" else "buoy" if layer in BUOYS else "beacon"
@@ -81,7 +124,12 @@ def mark_from_feature(layer, props, lon, lat):
         shape = int(shape) if shape is not None else 0
     except (TypeError, ValueError):
         shape = 0
-    return {
+    extra = {}
+    if kind == "light":
+        s1, s2 = number(props.get("SECTR1")), number(props.get("SECTR2"))
+        extra = {"sector": (s1, s2) if s1 is not None and s2 is not None else None,
+                 "character": light_characteristic(props)}
+    return {**extra,
         "kind": kind,
         "class": layer,
         "lon": lon,
@@ -112,6 +160,9 @@ def draw_mark(d, x, y, m, z, ss=1):
     s = symbol_size(z) * ss
     cols = [COLOURS.get(c, (128, 128, 128)) for c in m["colours"]] or [(128, 128, 128)]
     fill, outline = cols[0], (0, 0, 0)
+    if m["kind"] == "light" and m.get("sector"):
+        draw_sector(d, x, y, m, ss)
+        return
     if m["kind"] == "light":
         # magenta flare pointing up-right from the position
         d.polygon([(x, y), (x + s * 1.6, y - s * 2.2), (x + s * 0.4, y - s * 2.6)], fill=(220, 0, 220))
@@ -149,7 +200,49 @@ def draw_mark(d, x, y, m, z, ss=1):
     d.ellipse([x - 2 * ss, y - 2 * ss, x + 2 * ss, y + 2 * ss], outline=outline)
 
 
-def render_marks_tile(z, x, y, marks, lines, areas, ss=2):
+SECTOR_RADIUS = 26   # px, like the fixed 25 mm of S-52 (independent of the range)
+SECTOR_LIMIT = 52    # px, dashed sector limit lines
+
+
+def bearing_xy(bearing_deg, r):
+    """Screen offset for a true bearing (0 = up, clockwise)."""
+    a = math.radians(bearing_deg)
+    return r * math.sin(a), -r * math.cos(a)
+
+
+def draw_sector(d, x, y, m, ss=1):
+    """Sector of a light: SECTR1/SECTR2 are bearings FROM seaward TO the light, so the
+    light shines into the opposite directions; the sector runs clockwise from 1 to 2."""
+    s1, s2 = m["sector"]
+    a1, a2 = (s1 + 180.0) % 360.0, (s2 + 180.0) % 360.0
+    colour = COLOURS.get((m["colours"] or [1])[0], (128, 128, 128))
+    if colour == (255, 255, 255):
+        colour = (240, 200, 60)  # white sector drawn yellowish (visible on a light chart)
+    r = SECTOR_RADIUS * ss
+    for a in (a1, a2):  # sector limits
+        dx, dy = bearing_xy(a, SECTOR_LIMIT * ss)
+        draw_dashed(d, (x, y), (x + dx, y + dy), (0, 0, 0, 200), max(1, ss), 5 * ss)
+    # PIL arcs: degrees clockwise from 3 o'clock -> bearing - 90
+    start, end = a1 - 90.0, a2 - 90.0
+    if end <= start:
+        end += 360.0
+    d.arc([x - r, y - r, x + r, y + r], start, end, fill=(0, 0, 0), width=5 * ss)
+    d.arc([x - r, y - r, x + r, y + r], start, end, fill=colour, width=3 * ss)
+
+
+def draw_clearance(d, geom_px, kind, ss=1):
+    """Bridge: heavy dark outline; overhead cable: dashed magenta; pipe / conveyor: grey."""
+    for line in geom_px:
+        for a, b in zip(line, line[1:]):
+            if kind == "bridge":
+                d.line([a, b], fill=(60, 60, 60, 255), width=4 * ss)
+            elif kind == "cable":
+                draw_dashed(d, a, b, (200, 0, 200, 230), 2 * ss, 6 * ss)
+            else:
+                d.line([a, b], fill=(110, 110, 110, 230), width=2 * ss)
+
+
+def render_marks_tile(z, x, y, marks, lines, areas, ss=2, clearances=()):
     """One 256 px overlay tile (transparent). Pure: unit tested without GDAL."""
     size = 256 * ss
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
@@ -168,10 +261,13 @@ def render_marks_tile(z, x, y, marks, lines, areas, ss=2):
         sp = [tp(*p) for p in pts]
         for a, b in zip(sp, sp[1:]):
             draw_dashed(d, a, b, (60, 60, 60, 220), 2 * ss, 14 * ss)
+    for c in clearances:
+        draw_clearance(d, [[tp(*p) for p in line] for line in c["lines"]], c["kind"], ss)
     if z >= 12:
+        margin = (SECTOR_LIMIT + 8) * ss  # sector limits reach into the neighbour tiles
         for m in marks:
             px, py = tp(m["lon"], m["lat"])
-            if -40 * ss < px < size + 40 * ss and -40 * ss < py < size + 40 * ss:
+            if -margin < px < size + margin and -margin < py < size + margin:
                 draw_mark(d, px, py, m, z, ss)
     img = img.resize((256, 256), Image.LANCZOS)
     buf = io.BytesIO()
@@ -202,17 +298,66 @@ def place_labels(items, z, spacing_px):
             yield lon, lat, text, kind
 
 
-def labels_sidecar(soundings, marks, zmin, zmax):
+def clearance_value(c):
+    """Limiting vertical clearance in m: closed opening bridges count closed."""
+    for key in ("verccl", "verclr"):
+        if c.get(key) is not None:
+            return c[key]
+    return None
+
+
+def clearance_from_feature(layer, props, lines):
+    """Bridge / overhead cable / pipe -> dict (pure, unit tested)."""
+    return {"kind": CLEARANCE_LAYERS[layer], "name": (props.get("OBJNAM") or "").strip(),
+            "verclr": number(props.get("VERCLR")), "verccl": number(props.get("VERCCL")),
+            "vercop": number(props.get("VERCOP")), "horclr": number(props.get("HORCLR")),
+            "lines": [[(round(lon, 7), round(lat, 7)) for lon, lat in line] for line in lines if len(line) >= 2]}
+
+
+def clearance_anchor(c):
+    """Where the clearance label goes: the middle of the longest line."""
+    line = max(c["lines"], key=len)
+    return line[len(line) // 2] if len(line) > 2 else ((line[0][0] + line[-1][0]) / 2, (line[0][1] + line[-1][1]) / 2)
+
+
+def labels_sidecar(soundings, marks, zmin, zmax, clearances=()):
     merged = {}
+    values = {}
     for z in range(zmin, zmax + 1):
         items = []
+        # clearances first: they matter more than a sounding next to them
+        if z >= 13:
+            for c in clearances:
+                v = clearance_value(c)
+                if v is None or not c["lines"]:
+                    continue
+                lon, lat = clearance_anchor(c)
+                text = f"↕ {v:g} m" + (f" (offen {c['vercop']:g} m)" if c.get("vercop") is not None else "")
+                values[(round(lon, 6), round(lat, 6), text, "clearance")] = v
+                items.append((lon, lat, text, "clearance"))
         if z >= 14:
             items += [(lon, lat, f"{d:g}", "depth") for lon, lat, d in soundings]
         if z >= 15:
             items += [(m["lon"], m["lat"], m["name"], "place") for m in marks if m["name"]]
+            items += [(m["lon"], m["lat"], m["character"], "light") for m in marks if m.get("character")]
         for lon, lat, text, kind in place_labels(items, z, 40):
             merged.setdefault((round(lon, 6), round(lat, 6), text, kind), []).append(z)
-    return [{"lon": k[0], "lat": k[1], "text": k[2], "kind": k[3], "z": v} for k, v in merged.items()]
+    out = []
+    for k, v in merged.items():
+        entry = {"lon": k[0], "lat": k[1], "text": k[2], "kind": k[3], "z": v}
+        if k in values:
+            entry["value"] = values[k]
+        out.append(entry)
+    return out
+
+
+def write_clearances(path, clearances):
+    data = [{"kind": c["kind"], "name": c["name"], "clearance": clearance_value(c), "open": c.get("vercop"),
+             "horizontal": c.get("horclr"), "lines": c["lines"]}
+            for c in clearances if clearance_value(c) is not None]
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"version": 1, "clearances": data}, fh, ensure_ascii=False)
+    return len(data)
 
 
 # ---- reading (GDAL) ------------------------------------------------------------------
@@ -224,7 +369,7 @@ def read_enc(paths):
         sys.exit("GDAL Python bindings missing: apt install python3-gdal (or pip install gdal)")
     os.environ.setdefault("OGR_S57_OPTIONS", "RETURN_PRIMITIVES=OFF,SPLIT_MULTIPOINT=ON,ADD_SOUNDG_DEPTH=ON,"
                                              "LNAM_REFS=OFF,UPDATES=APPLY")
-    depth_features, marks, lines, areas, soundings = [], [], [], [], []
+    depth_features, marks, lines, areas, soundings, clearances = [], [], [], [], [], []
     for path in paths:
         ds = ogr.Open(path)
         if ds is None:
@@ -233,7 +378,7 @@ def read_enc(paths):
         for i in range(ds.GetLayerCount()):
             layer = ds.GetLayerByIndex(i)
             name = layer.GetName().upper()
-            if name not in MARK_LAYERS + LINE_LAYERS + AREA_LAYERS + DEPTH_LAYERS + ("SOUNDG",):
+            if name not in MARK_LAYERS + LINE_LAYERS + AREA_LAYERS + DEPTH_LAYERS + tuple(CLEARANCE_LAYERS) + ("SOUNDG",):
                 continue
             for f in layer:
                 g = f.GetGeometryRef()
@@ -251,6 +396,8 @@ def read_enc(paths):
                         p = g.GetGeometryRef(k) if g.GetGeometryCount() else g
                         if p.GetCoordinateDimension() >= 3:
                             soundings.append((p.GetX(), p.GetY(), round(p.GetZ(), 1)))
+                elif name in CLEARANCE_LAYERS:
+                    clearances.append(clearance_from_feature(name, props, geometry_lines(g)))
                 elif name in MARK_LAYERS:
                     marks.append(mark_from_feature(name, props, g.GetX(), g.GetY()))
                 elif name in LINE_LAYERS:
@@ -260,7 +407,18 @@ def read_enc(paths):
                         ring = g.GetGeometryRef(k)
                         if ring.GetGeometryName() == "LINEARRING":
                             areas.append([(ring.GetX(j), ring.GetY(j)) for j in range(ring.GetPointCount())])
-    return depth_features, marks, lines, areas, soundings
+    return depth_features, marks, lines, areas, soundings, clearances
+
+
+def geometry_lines(g):
+    """Lines (and polygon rings) of an OGR geometry as [[(lon, lat), ...], ...]."""
+    if g.GetGeometryCount() == 0:
+        n = g.GetPointCount()
+        return [[(g.GetX(k), g.GetY(k)) for k in range(n)]] if n >= 2 else []
+    out = []
+    for k in range(g.GetGeometryCount()):
+        out += geometry_lines(g.GetGeometryRef(k))
+    return out
 
 
 def enc_files(spec):
@@ -282,11 +440,12 @@ def main():
     paths = [f for spec in args.enc for f in enc_files(spec)]
     if not paths:
         sys.exit("no *.000 cells found")
-    depth_features, marks, lines, areas, soundings = read_enc(paths)
+    depth_features, marks, lines, areas, soundings, clearances = read_enc(paths)
     print(f"{len(paths)} cells: {len(depth_features)} depth features, {len(marks)} marks, "
-          f"{len(lines)} lines, {len(areas)} fairways, {len(soundings)} soundings")
+          f"{len(lines)} lines, {len(areas)} fairways, {len(soundings)} soundings, {len(clearances)} clearances")
 
     pts = [(m["lon"], m["lat"]) for m in marks] + [p for l in lines for p in l] + [p for a in areas for p in a]
+    pts += [p for c in clearances for line in c["lines"] for p in line]
     for f in depth_features:
         coords = json.dumps(f["geometry"]["coordinates"])
         nums = [float(v) for v in coords.replace("[", " ").replace("]", " ").replace(",", " ").split()]
@@ -323,13 +482,15 @@ def main():
     db = open_mbtiles(args.out + "-marks.mbtiles", args)
     for i, (z, x, y) in enumerate(jobs, 1):
         db.execute("INSERT OR REPLACE INTO tiles VALUES (?, ?, ?, ?)",
-                   (z, x, (1 << z) - 1 - y, render_marks_tile(z, x, y, marks, lines, areas)))
+                   (z, x, (1 << z) - 1 - y, render_marks_tile(z, x, y, marks, lines, areas, clearances=clearances)))
         if i % 500 == 0:
             db.commit()
             print(f"{i}/{len(jobs)}")
     db.commit()
     db.close()
-    labels = labels_sidecar(soundings, marks, args.zmin, args.zmax)
+    labels = labels_sidecar(soundings, marks, args.zmin, args.zmax, clearances)
+    n_clear = write_clearances(args.out + "-marks.mbtiles.clearances.json", clearances)
+    print(f"{n_clear} vertical clearances -> {args.out}-marks.mbtiles.clearances.json")
     with open(args.out + "-marks.mbtiles.labels.json", "w", encoding="utf-8") as fh:
         json.dump({"version": 1, "labels": labels}, fh, ensure_ascii=False)
     print(f"done: {args.out}-depth.mbtiles, {args.out}-marks.mbtiles ({len(jobs)} tiles, {len(labels)} labels)")

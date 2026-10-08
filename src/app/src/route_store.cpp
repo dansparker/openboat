@@ -72,22 +72,23 @@ void RouteStore::setDepthChart(const QString& path) {
     if (chart->valid()) depth_ = std::move(chart);
 }
 
-void RouteStore::checkPoints(const QVariantList& points, double safety_m, const QString& name) {
-    if (!depth_) {
-        check_ = QVariantMap{{"available", false}, {"name", name}};
-    } else {
-        check_ = checkRouteDepth(*depth_, points, safety_m);
-        check_["available"] = true;
-        check_["name"] = name;
-        check_["safety"] = safety_m;
-    }
+void RouteStore::checkPoints(const QVariantList& points, double safety_m, double air_draft_m, const QString& name) {
+    check_ = depth_ ? checkRouteDepth(*depth_, points, safety_m) : QVariantMap{};
+    check_["available"] = depth_ != nullptr;
+    const QVariantMap c = checkRouteClearance(points, clearances_, air_draft_m);
+    check_["crossings"] = c.value("crossings");
+    check_["lowCount"] = c.value("lowCount");
+    check_["clearanceData"] = !clearances_.isEmpty();
+    check_["name"] = name;
+    check_["safety"] = safety_m;
+    check_["airDraft"] = air_draft_m;
     emit checkChanged();
 }
 
-void RouteStore::checkRoute(int index, double safety_m) {
+void RouteStore::checkRoute(int index, double safety_m, double air_draft_m) {
     if (index < 0 || index >= routes_.size()) return;
     const QVariantMap r = routes_[index].toMap();
-    checkPoints(r.value("points").toList(), safety_m, r.value("name").toString());
+    checkPoints(r.value("points").toList(), safety_m, air_draft_m, r.value("name").toString());
 }
 
 void RouteStore::clearCheck() {

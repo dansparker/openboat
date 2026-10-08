@@ -45,8 +45,11 @@ public:
 
     // Depth-encoded chart used by checkRoute (empty: none)
     void setDepthChart(const QString& path);
-    Q_INVOKABLE void checkRoute(int index, double safety_m);
-    Q_INVOKABLE void checkPoints(const QVariantList& points, double safety_m, const QString& name);
+    // Bridges / cables / pipes from all charts' *.clearances.json
+    void setClearances(QVariantList clearances) { clearances_ = std::move(clearances); }
+    // Depth (safety depth) and vertical clearance (air draught, 0 = not set) of a route
+    Q_INVOKABLE void checkRoute(int index, double safety_m, double air_draft_m);
+    Q_INVOKABLE void checkPoints(const QVariantList& points, double safety_m, double air_draft_m, const QString& name);
     Q_INVOKABLE void clearCheck();
 
     // Where removable drives are mounted (Linux: /media/<user>/<label>, /run/media/..., /mnt/...).
@@ -97,4 +100,5 @@ private:
     QString usb_message_;
     std::unique_ptr<DepthChart> depth_;
     QVariantMap check_;
+    QVariantList clearances_;
 };

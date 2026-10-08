@@ -250,6 +250,7 @@ int main(int argc, char* argv[]) {
     QVariantList layers;
     int index = 0;
     bool depth_chart_set = false;
+    QVariantList clearances;
     for (const auto& value : config.value("charts").toArray()) {
         const QString path = resolve(base_dir, value.toString());
         const auto info = MbTilesProvider::inspect(path);
@@ -261,6 +262,10 @@ int main(int argc, char* argv[]) {
             routes.setDepthChart(path);  // route check against the safety depth
             depth_chart_set = true;
         }
+        // Bridges / overhead cables of ENC charts (tools/make_enc.py): route check against the air draught
+        if (QFile file(path + QStringLiteral(".clearances.json")); file.open(QIODevice::ReadOnly)) {
+            clearances.append(QJsonDocument::fromJson(file.readAll()).object().value("clearances").toArray().toVariantList());
+        }
         const QString id = QStringLiteral("chart%1").arg(index++);
         engine.addImageProvider(id, new MbTilesProvider(path, info.depth_encoded));
         layers.append(QVariantMap{{"provider", id}, {"name", info.name}, {"attribution", info.attribution},
@@ -268,6 +273,7 @@ int main(int argc, char* argv[]) {
                                   {"maxZoom", info.max_zoom}});
     }
 
+    routes.setClearances(clearances);
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("routes"), &routes);

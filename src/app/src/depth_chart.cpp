@@ -69,6 +69,58 @@ std::optional<double> DepthChart::depthAt(double lat, double lon) {
     return (qRed(p) * 256 + qGreen(p)) / 10.0;
 }
 
+namespace {
+
+struct XY {
+    double x, y;
+};
+
+// Intersection of segments ab and cd (planar), parameter along ab; nullopt if none
+std::optional<double> intersect(XY a, XY b, XY c, XY d) {
+    const double rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+    const double den = rx * sy - ry * sx;
+    if (std::abs(den) < 1e-15) return std::nullopt;  // parallel
+    const double t = ((c.x - a.x) * sy - (c.y - a.y) * sx) / den;
+    const double u = ((c.x - a.x) * ry - (c.y - a.y) * rx) / den;
+    if (t < 0.0 || t > 1.0 || u < 0.0 || u > 1.0) return std::nullopt;
+    return t;
+}
+
+}  // namespace
+
+QVariantMap checkRouteClearance(const QVariantList& points, const QVariantList& clearances, double air_draft_m) {
+    QVariantList crossings;
+    int low = 0;
+    for (qsizetype i = 0; i + 1 < points.size(); ++i) {
+        const QVariantMap pa = points[i].toMap(), pb = points[i + 1].toMap();
+        // local plane: longitude scaled by cos(latitude) - fine for the few km of a leg
+        const double k = std::cos(pa.value("lat").toDouble() * std::numbers::pi / 180.0);
+        const XY a{pa.value("lon").toDouble() * k, pa.value("lat").toDouble()};
+        const XY b{pb.value("lon").toDouble() * k, pb.value("lat").toDouble()};
+        for (const QVariant& cv : clearances) {
+            const QVariantMap c = cv.toMap();
+            std::optional<double> best;
+            for (const QVariant& lv : c.value("lines").toList()) {
+                const QVariantList line = lv.toList();
+                for (qsizetype j = 0; j + 1 < line.size(); ++j) {
+                    const QVariantList p = line[j].toList(), q = line[j + 1].toList();
+                    if (p.size() < 2 || q.size() < 2) continue;
+                    const auto t = intersect(a, b, {p[0].toDouble() * k, p[1].toDouble()}, {q[0].toDouble() * k, q[1].toDouble()});
+                    if (t && (!best || *t < *best)) best = t;
+                }
+            }
+            if (!best) continue;
+            const double clearance = c.value("clearance").toDouble();
+            const bool is_low = air_draft_m > 0.0 && clearance < air_draft_m;
+            if (is_low) ++low;
+            crossings.append(QVariantMap{{"lat", a.y + (b.y - a.y) * *best}, {"lon", (a.x + (b.x - a.x) * *best) / k},
+                                         {"clearance", clearance}, {"name", c.value("name")}, {"kind", c.value("kind")},
+                                         {"leg", static_cast<int>(i + 1)}, {"low", is_low}});
+        }
+    }
+    return QVariantMap{{"crossings", crossings}, {"lowCount", low}};
+}
+
 QVariantMap checkRouteDepth(DepthChart& chart, const QVariantList& points, double safety_m) {
     namespace core = boat::core;
     QVariantList marks;

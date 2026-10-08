@@ -148,10 +148,46 @@ private slots:
         core::DataBus bus;
         RouteStore r(bus, dir.filePath("nav.gpx"));
         r.addRoute({pt(47.87, 13.54), pt(47.88, 13.55)});
-        r.checkRoute(0, 3.0);
+        r.checkRoute(0, 3.0, 0.0);
         QCOMPARE(r.routeCheck().value("available").toBool(), false);
+        QCOMPARE(r.routeCheck().value("clearanceData").toBool(), false);
         r.clearCheck();
         QVERIFY(r.routeCheck().isEmpty());
+    }
+
+    void bridgesOnTheRoute() {
+        // a bridge across the route (east-west line at 47.875) and a cable beside it
+        const auto line = [](double lon1, double lat1, double lon2, double lat2) {
+            return QVariantList{QVariantList{QVariantList{lon1, lat1}, QVariantList{lon2, lat2}}};
+        };
+        const QVariantList clearances{
+            QVariantMap{{"kind", "bridge"}, {"name", "Seebrücke"}, {"clearance", 6.2}, {"lines", line(13.53, 47.875, 13.56, 47.875)}},
+            QVariantMap{{"kind", "cable"}, {"name", ""}, {"clearance", 3.0}, {"lines", line(13.60, 47.87, 13.60, 47.88)}}};
+        const QVariantList route{pt(47.87, 13.545), pt(47.88, 13.545)};
+
+        auto r = checkRouteClearance(route, clearances, 8.0);  // mast 8 m: too high
+        QCOMPARE(r.value("crossings").toList().size(), 1);      // the cable is not on the route
+        QCOMPARE(r.value("lowCount").toInt(), 1);
+        const auto k = r.value("crossings").toList()[0].toMap();
+        QCOMPARE(k.value("name").toString(), QString("Seebrücke"));
+        QVERIFY(qAbs(k.value("lat").toDouble() - 47.875) < 1e-6);
+        QCOMPARE(k.value("leg").toInt(), 1);
+
+        r = checkRouteClearance(route, clearances, 5.0);        // 5 m fits under 6.2 m
+        QCOMPARE(r.value("lowCount").toInt(), 0);
+        QCOMPARE(r.value("crossings").toList().size(), 1);
+        r = checkRouteClearance(route, clearances, 0.0);        // not set: listed, never "low"
+        QCOMPARE(r.value("lowCount").toInt(), 0);
+
+        // through the RouteStore (as the UI does it)
+        QTemporaryDir dir;
+        core::DataBus bus;
+        RouteStore store(bus, dir.filePath("nav.gpx"));
+        store.setClearances(clearances);
+        store.addRoute(route);
+        store.checkRoute(0, 3.0, 8.0);
+        QCOMPARE(store.routeCheck().value("lowCount").toInt(), 1);
+        QVERIFY(store.routeCheck().value("clearanceData").toBool());
     }
 
     void logbookTakesDataFromTheBus() {
@@ -196,6 +232,21 @@ private slots:
         QCOMPARE(again.lastLon(), 9.087);
         again.rememberPosition(47.6776, 9.087);  // 11 m: not worth a write
         QCOMPARE(again.lastLat(), 47.6775);
+    }
+
+    void airDraftIsKept() {
+        QTemporaryDir dir;
+        core::DataBus bus;
+        {
+            Settings s(bus, dir.filePath("settings.json"), QJsonObject{});
+            QCOMPARE(s.airDraft(), 0.0);  // not set until the skipper enters it
+            s.setAirDraft(11.5);
+            s.setAirDraft(-3);            // clamped
+            QCOMPARE(s.airDraft(), 0.0);
+            s.setAirDraft(11.5);
+        }
+        Settings again(bus, dir.filePath("settings.json"), QJsonObject{});
+        QCOMPARE(again.airDraft(), 11.5);
     }
 
     void settingsDepthText() {

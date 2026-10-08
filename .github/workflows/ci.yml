@@ -71,6 +71,9 @@ jobs:
         run: |
           sudo apt-get install -y python3-gdal python3-numpy python3-pil
           /usr/bin/python3 tests/python/test_enc_gdal.py
+          # SYNTHETIC ENC around the simulator (sector light, buoys, bridge, cable) for a screenshot
+          /usr/bin/python3 .github/scripts/synthetic_enc.py enc-synth
+          /usr/bin/python3 tools/make_enc.py --enc enc-synth/*.geojson --zooms 13-17 --out charts/enc             --name "ENC SYNTHETISCH" --attribution "SYNTHETISCHE ENC-Daten – nicht zur Navigation"
       - name: SYNTHETIC depth overlay for the screenshots (labelled as such, never shipped)
         run: |
           if [ -f charts/base.mbtiles ]; then
@@ -89,13 +92,16 @@ jobs:
       - name: Smoke test + screenshots (simulator, no QML errors)
         run: |
           app=./build/release/src/app/openboat
-          for mode in day night settings track courseup ais; do
+          python3 -c "import json; c=json.load(open('config/boat.example.json', encoding='utf-8')); c['charts'].append('../charts/enc-marks.mbtiles'); json.dump(c, open('config/enc.json', 'w', encoding='utf-8'))"
+          for mode in day night settings track courseup ais enc; do
             rm -f config/settings.json
             [ "$mode" = courseup ] && echo '{"orientation": "course", "safety_depth_m": 10}' > config/settings.json
             flag=""; [ "$mode" = night ] && flag="--night"; [ "$mode" = settings ] && flag="--page settings"; [ "$mode" = ais ] && flag="--page ais"
             [ "$mode" = track ] && flag="--zoom 18"
+            cfg=config/boat.example.json
+            if [ "$mode" = enc ]; then cfg=config/enc.json; flag="--zoom 15"; echo '{"air_draft_m": 12}' > config/settings.json; fi
             set +e
-            QT_DEBUG_PLUGINS=0 QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config config/boat.example.json --demo $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
+            QT_DEBUG_PLUGINS=0 QT_QUICK_BACKEND=software QT_QPA_PLATFORM=xcb timeout -k 5 60 xvfb-run -a -s "-screen 0 1280x800x24" $app --config $cfg --demo $flag --screenshot screenshot-$mode.png --screenshot-delay 9000 > app-$mode.log 2>&1
             rc=$?
             set -e
             cat app-$mode.log

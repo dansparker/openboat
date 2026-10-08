@@ -372,6 +372,21 @@ Item {
                 texts.push({ x: x, y: y, dx: 14, dy: 0, text: settings.depthText(m.depth), font: "bold 15px sans-serif", colour: String(Theme.danger), align: "left" });
             }
 
+            // Too low bridges / cables found by the route check
+            for (const k of (routes.routeCheck.crossings || [])) {
+                if (!k.low) continue;
+                const x = chart.screenX(k.lon), y = chart.screenY(k.lat);
+                ctx.strokeStyle = String(Theme.danger);
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(x - 12, y - 8); ctx.lineTo(x + 12, y - 8);
+                ctx.moveTo(x - 12, y + 8); ctx.lineTo(x + 12, y + 8);
+                ctx.moveTo(x, y - 14); ctx.lineTo(x, y + 14);
+                ctx.stroke();
+                texts.push({ x: x, y: y, dx: 16, dy: 0, text: "↕ " + settings.depthText(k.clearance), font: "bold 15px sans-serif",
+                             colour: String(Theme.danger), align: "left" });
+            }
+
             // Route being edited
             const orange = String(Theme.anchor);
             line(ctx, chart.editPoints, orange, 3);
@@ -523,10 +538,10 @@ Item {
             if (zoom - ez > 6 || (zoom > l.maxZoom && !settings.overzoom)) continue;
             for (const lab of l.labels) {
                 if (lab.z.indexOf(ez) < 0) continue;
-                out.push({ wx: worldX(lab.lon), wy: worldY(lab.lat), text: lab.text, kind: lab.kind });
+                out.push({ wx: worldX(lab.lon), wy: worldY(lab.lat), text: lab.text, kind: lab.kind, value: lab.value });
             }
         }
-        const rank = { city: 0, town: 1, village: 2, place: 3, hamlet: 4, depth: 5 };
+        const rank = { clearance: 0, city: 1, town: 2, village: 3, place: 4, light: 5, hamlet: 6, depth: 7 };
         out.sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3));
         return out;
     }
@@ -582,10 +597,16 @@ Item {
                 for (const l of chart.chartLabels) {
                     const p = toScreen(chart.wrapDx(l.wx - chart.centerX) + chart.width / 2, l.wy - chart.centerY + chart.height / 2);
                     if (p.x < -100 || p.y < -20 || p.x > width + 100 || p.y > height + 20) continue;
+                    // too low for this boat: red and bold (settings: air draught)
+                    const tooLow = l.kind === "clearance" && settings.airDraft > 0 && l.value < settings.airDraft;
                     const font = l.kind === "depth" ? "11px sans-serif"
-                               : (l.kind === "city" || l.kind === "town") ? "bold 16px sans-serif" : "13px sans-serif";
+                               : tooLow ? "bold 15px sans-serif"
+                               : l.kind === "light" ? "italic 12px sans-serif"
+                               : (l.kind === "city" || l.kind === "town" || l.kind === "clearance") ? "bold 14px sans-serif" : "13px sans-serif";
                     if (!fits(ctx, p.x, p.y, l.text, font, "center")) continue;
                     if (l.kind === "depth") draw(ctx, p.x, p.y, l.text, font, depth, depthHalo, "center");
+                    else if (l.kind === "clearance") draw(ctx, p.x, p.y, l.text, font, tooLow ? String(Theme.danger) : depth, halo, "center");
+                    else if (l.kind === "light") draw(ctx, p.x, p.y, l.text, font, Theme.night ? "#a03070" : "#8a1a8a", halo, "center");
                     else draw(ctx, p.x, p.y, l.text, font, place, halo, "center");
                 }
             }

@@ -24,7 +24,9 @@ LAYERS = {
     "DEPCNT": [({"type": "LineString", "coordinates": [[9.09, 47.665], [9.09, 47.675]]}, {"VALDCO": 10.0})],
     "BOYLAT": [({"type": "Point", "coordinates": [9.08, 47.67]}, {"BOYSHP": 2, "COLOUR": "3", "OBJNAM": "Rot 1"})],
     "BOYCAR": [({"type": "Point", "coordinates": [9.10, 47.67]}, {"BOYSHP": 4, "COLOUR": "2,6", "CATCAM": 1})],
-    "LIGHTS": [({"type": "Point", "coordinates": [9.08, 47.67]}, {"COLOUR": "3"})],
+    "LIGHTS": [({"type": "Point", "coordinates": [9.08, 47.67]}, {"COLOUR": "3", "SECTR1": 90.0, "SECTR2": 180.0,
+                                                                 "LITCHR": "2", "SIGPER": 4.0})],
+    "BRIDGE": [({"type": "LineString", "coordinates": [[9.075, 47.672], [9.085, 47.672]]}, {"VERCLR": 6.2, "OBJNAM": "Testbrücke"})],
     "FAIRWY": [({"type": "Polygon", "coordinates": [[[9.075, 47.668], [9.105, 47.668], [9.105, 47.672], [9.075, 47.668]]]}, {})],
     "SOUNDG": [({"type": "MultiPoint", "coordinates": [[9.08, 47.668, 3.4], [9.1, 47.668, 14.2]]}, {})],
 }
@@ -43,7 +45,10 @@ def write_layers(tmp):
 
 def test_read_enc():
     with tempfile.TemporaryDirectory() as tmp:
-        depth, marks, lines, areas, soundings = make_enc.read_enc(write_layers(tmp))
+        depth, marks, lines, areas, soundings, clearances = make_enc.read_enc(write_layers(tmp))
+        assert len(clearances) == 1 and clearances[0]["verclr"] == 6.2
+        light = [m for m in marks if m["class"] == "LIGHTS"][0]
+        assert light["sector"] == (90.0, 180.0) and light["character"].startswith("Fl R 4s")
         assert len(depth) == 3
         assert sorted(m["class"] for m in marks) == ["BOYCAR", "BOYLAT", "LIGHTS"]
         assert len(areas) == 1
@@ -65,6 +70,9 @@ def test_end_to_end():
         enc.close()
         labels = json.load(open(out + "-marks.mbtiles.labels.json", encoding="utf-8"))["labels"]
         assert any(l["text"] == "3.4" for l in labels)
+        assert any(l["kind"] == "clearance" and l["value"] == 6.2 for l in labels)
+        cl = json.load(open(out + "-marks.mbtiles.clearances.json", encoding="utf-8"))["clearances"]
+        assert cl[0]["clearance"] == 6.2 and cl[0]["name"] == "Testbrücke"
 
 
 if __name__ == "__main__":
