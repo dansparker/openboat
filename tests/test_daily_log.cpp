@@ -15,10 +15,10 @@ using namespace boat;
 TEST(DailyLog, TimeTagRoundTrip) {
     const auto ms = core::unix_ms(2026, 10, 8, 12, 30, 15);
     const std::string tag = core::nmea_time_tag(ms);
-    EXPECT_EQ(tag.front(), '\');
+    EXPECT_EQ(tag.front(), '\\');
     EXPECT_EQ(core::nmea_tag_time_ms(tag + "$GPRMC,..."), ms);
-    EXPECT_EQ(core::nmea_tag_time_ms("\s:r003669,c:1696789012*5A\!AIVDM"), 1696789012000);
-    EXPECT_EQ(core::nmea_tag_time_ms("\c:1696789012345*00\$GP"), 1696789012345);  // milliseconds
+    EXPECT_EQ(core::nmea_tag_time_ms("\\s:r003669,c:1696789012*5A\\!AIVDM"), 1696789012000);
+    EXPECT_EQ(core::nmea_tag_time_ms("\\c:1696789012345*00\\$GP"), 1696789012345);  // milliseconds
     EXPECT_EQ(core::nmea_tag_time_ms("$GPRMC,no tag"), -1);
 }
 

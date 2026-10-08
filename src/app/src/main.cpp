@@ -89,6 +89,11 @@ std::unique_ptr<Module> make_source(const QJsonObject& s, const QString& base_di
         sim.centre.lat_deg = s.value("lat").toDouble(sim.centre.lat_deg);
         sim.centre.lon_deg = s.value("lon").toDouble(sim.centre.lon_deg);
         sim.radius_m = s.value("radius_m").toDouble(sim.radius_m);
+        // [shallowest, deepest] along the circle - set it to the real water there
+        if (const auto d = s.value("depth_m").toArray(); d.size() == 2) {
+            sim.depth_min_m = d[0].toDouble(sim.depth_min_m);
+            sim.depth_max_m = std::max(sim.depth_min_m, d[1].toDouble(sim.depth_max_m));
+        }
         // elsewhere than the Attersee the demo AIS targets would sail over land
         sim.ais_targets = s.value("ais").toBool(!s.contains("lat"));
         return std::make_unique<boat::sim::Simulator>(sim);
@@ -239,6 +244,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Charts: first entry is the base map, the rest are overlays (e.g. seamarks)
+    // Before the engine: QML objects must outlive it (destroyed in reverse order)
+    Logbook logbook(bus, resolve(base_dir, config.value("logbook_file").toString("logbook.json")));
     QQmlApplicationEngine engine;
     QVariantList layers;
     int index = 0;
@@ -264,7 +271,6 @@ int main(int argc, char* argv[]) {
     engine.rootContext()->setContextProperty(QStringLiteral("boat"), &model);
     engine.rootContext()->setContextProperty(QStringLiteral("chartLayers"), layers);
     engine.rootContext()->setContextProperty(QStringLiteral("routes"), &routes);
-    Logbook logbook(bus, resolve(base_dir, config.value("logbook_file").toString("logbook.json")));
     engine.rootContext()->setContextProperty(QStringLiteral("logbook"), &logbook);
     engine.rootContext()->setContextProperty(QStringLiteral("settings"), &settings);
     engine.rootContext()->setContextProperty(QStringLiteral("startFullScreen"), cli.isSet(fullscreen_opt));
